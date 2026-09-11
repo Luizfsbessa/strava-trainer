@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Treinamento - Strava Trainer</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-6 md:p-10">
+  <div class="max-w-5xl mx-auto">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-800 pb-6 gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold tracking-tight text-sky-400">Planejador de Treinos</h1>
+        <p class="text-slate-400 text-sm mt-1">Matriz semanal baseada em carga ACWR e progressão de performance.</p>
+      </div>
+      <button onclick="fetchPlan()" class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-5 py-2.5 rounded-lg transition shadow-lg shadow-sky-900/20 cursor-pointer flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Gerar Novo Plano
+      </button>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Rodado na Semana</span>
+        <span class="text-2xl font-black text-sky-400" id="stat-current-km">-- km</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Volume Alvo</span>
+        <span class="text-2xl font-black text-slate-200" id="stat-target-km">-- km</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Estratégia ACWR</span>
+        <span class="text-sm font-bold px-2.5 py-1 rounded-md bg-sky-950 text-sky-300 border border-sky-800/50 inline-block mt-1" id="stat-strategy">-</span>
+      </div>
+    </div>
+
+    <div id="strategy-container" class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8 shadow-xl hidden">
+      <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Fundamentação do Motor</span>
+      <p class="text-slate-300 text-sm leading-relaxed" id="plan-rationale">-</p>
+    </div>
+
+    <div id="loading" class="text-center py-20 text-slate-400">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-sky-500 border-t-transparent mb-4"></div>
+      <p>Carregando plano e estatísticas...</p>
+    </div>
+
+    <div id="sessions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+  </div>
+
+  <script>
+    async function fetchPlan() {
+      const loadingEl = document.getElementById('loading');
+      const gridEl = document.getElementById('sessions-grid');
+      const strategyContainer = document.getElementById('strategy-container');
+
+      loadingEl.classList.remove('hidden');
+      gridEl.innerHTML = '';
+      strategyContainer.classList.add('hidden');
+
+      try {
+        const response = await fetch('/api/training/plan');
+        const data = await response.json();
+
+        document.getElementById('stat-current-km').innerText = `${data.currentWeekKm || 0} km`;
+        document.getElementById('stat-target-km').innerText = `${data.recommendedVolumeKm || 0} km`;
+        document.getElementById('stat-strategy').innerText = data.strategy || 'MANUTENCAO';
+        document.getElementById('plan-rationale').innerText = data.rationale || 'Nenhuma justificativa informada.';
+        
+        strategyContainer.classList.remove('hidden');
+
+        gridEl.innerHTML = data.sessions.map(s => `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition">
+            <div>
+              <div class="text-xs font-bold tracking-wider text-sky-400 uppercase mb-2">${s.dayOfWeek}</div>
+              <h3 class="text-lg font-bold text-slate-100 mb-3">${s.sessionType}</h3>
+              <p class="text-slate-400 text-sm leading-relaxed mb-4">${s.description}</p>
+            </div>
+            ${s.videoSearchTerm ? `
+              <div class="mt-auto pt-3 border-t border-slate-800/80 flex items-center gap-2 text-xs text-slate-400">
+                <span class="bg-sky-950 text-sky-300 px-2.5 py-1 rounded-md font-mono truncate w-full">${s.videoSearchTerm}</span>
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error('Erro ao buscar plano:', err);
+      } finally {
+        loadingEl.classList.add('hidden');
+      }
+    }
+
+    fetchPlan();
+  </script>
+</body>
+</html>

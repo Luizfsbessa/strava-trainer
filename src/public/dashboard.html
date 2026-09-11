@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strava Trainer - Painel de Performance</title>
+  <style>
+    :root {
+      --bg-main: #060911;
+      --bg-card: #0f172a;
+      --bg-card-hover: #1e293b;
+      --border-color: #1e293b;
+      --border-glow: #334155;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      background: var(--bg-main); 
+      color: var(--text-main); 
+      margin: 0; 
+      padding: 0; 
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 30px 20px; 
+  box-sizing: border-box; 
+}
+    
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px;}
+
+    h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; letter-spacing: -0.5px; }
+    .subtitle { color: var(--text-muted); font-size: 13px; }
+    
+    .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nav-links a { 
+      background: var(--bg-card); 
+      border: 1px solid var(--border-color); 
+      color: var(--text-muted); 
+      padding: 8px 14px; 
+      border-radius: 8px; 
+      text-decoration: none; 
+      font-size: 13px; 
+      font-weight: 600; 
+      transition: all 0.2s ease; 
+    }
+    .nav-links a:hover { border-color: var(--accent-blue); color: var(--text-main); }
+    .nav-links a.active { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.08); color: var(--accent-blue); }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .metric-card { 
+      background: var(--bg-card); 
+      border: 1px solid var(--border-color); 
+      border-radius: 12px; 
+      padding: 18px; 
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 3px; height: 100%;
+      background: var(--accent-blue);
+      opacity: 0.6;
+    }
+    .metric-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 8px; }
+    .metric-value { font-size: 22px; font-weight: 800; color: var(--text-main); }
+    .metric-value.highlight { color: var(--accent-blue); }
+
+    .main-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+    @media (max-width: 900px) {
+      .main-layout { grid-template-columns: 1fr; }
+    }
+
+    .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-main); display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px; }
+    
+    .card { 
+      background: var(--bg-card); 
+      border-radius: 10px; 
+      padding: 16px; 
+      margin-bottom: 12px; 
+      border: 1px solid var(--border-color); 
+      transition: all 0.2s ease; 
+      position: relative; 
+    }
+    .card:hover { border-color: var(--border-glow); transform: translateY(-1px); }
+    .day { font-weight: 700; color: var(--accent-blue); text-transform: uppercase; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
+    .type { font-size: 15px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+    .desc { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+    
+    .workout-details { 
+      display: flex; 
+      gap: 16px; 
+      background: rgba(4, 7, 15, 0.6); 
+      padding: 10px 12px; 
+      border-radius: 8px; 
+      font-size: 11px; 
+      margin-bottom: 10px; 
+      border: 1px solid var(--border-color); 
+      flex-wrap: wrap; 
+    }
+    .workout-details span { color: var(--text-muted); }
+    .workout-details strong { color: var(--text-main); }
+
+    .zone-badge { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .z0 { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); }
+    .z1 { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); }
+    .z2 { background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); }
+    .z3 { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
+    .z4 { background: rgba(249, 115, 22, 0.12); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.25); }
+    .z5 { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+
+    .tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(3, 105, 161, 0.2); color: #38bdf8; border: 1px solid rgba(3, 105, 161, 0.4); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
+    .tag:hover { background: rgba(3, 105, 161, 0.4); color: #fff; }
+
+    .sidebar-panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: fit-content; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    input, select { width: 100%; padding: 10px 12px; background: #060911; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 13px; transition: border-color 0.2s; }
+    input:focus, select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15); }
+    
+    .btn { background: var(--accent-green); color: white; border: none; padding: 11px; font-weight: 700; border-radius: 8px; cursor: pointer; width: 100%; font-size: 13px; transition: background 0.2s, transform 0.1s; }
+    .btn:hover { background: #059669; }
+    .btn:active { transform: scale(0.99); }
+    .btn-strava { background: #fc4c02; margin-top: 4px; }
+    .btn-strava:hover { background: #e04400; }
+    
+    .divider { border: 0; border-top: 1px solid var(--border-color); margin: 20px 0; }
+    
+    .rationale-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Planejador de Treinos</h1>
+        <div class="subtitle" id="subtitle-info">Carregando perfil...</div>
+      </div>
+      <div class="nav-links">
+        <a href="dashboard.html" class="active">Dashboard</a>
+        <a href="profile.html">Meu Perfil</a>
+        <a href="history.html">Histórico</a>
+        <a href="analytics.html">Análise</a>
+      </div>
+    </header>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Rodado na Semana</div>
+        <div class="metric-value highlight" id="m-week-km">0.0 km</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Volume Alvo (Dinâmico)</div>
+        <div class="metric-value" id="m-target-km">0.0 km</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Objetivo Atual</div>
+        <div class="metric-value" id="m-objective" style="font-size: 13px; margin-top: 4px; color: var(--accent-green);">-</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Peso / Projeção Meta</div>
+        <div class="metric-value" id="m-weight" style="font-size: 14px; margin-top: 4px; color: var(--accent-blue);">-</div>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <div>
+        <div class="section-title">📅 Matriz Modulada com Sugestão de Pace e Carga</div>
+        <div class="rationale-box" id="rationale-box">
+          Carregando diretrizes do algoritmo...
+        </div>
+        <div id="sessions-container"></div>
+      </div>
+
+      <div>
+        <div class="sidebar-panel">
+          <div class="section-title" style="font-size: 14px;">⚡ Importar do Strava (GPX)</div>
+          <form id="gpx-form" onsubmit="uploadGpx(event)">
+            <div class="form-group">
+              <input type="file" id="gpxFiles" accept=".gpx" multiple required style="padding: 8px; font-size: 11px; cursor: pointer;">
+            </div>
+            <button type="submit" class="btn btn-strava">Importar Arquivo(s) GPX</button>
+          </form>
+
+          <hr class="divider">
+
+          <div class="section-title" style="font-size: 14px;">✍️ Lançamento Manual</div>
+          <form id="workout-form" onsubmit="submitWorkout(event)">
+            <div class="form-group">
+              <label>Tipo de Atividade</label>
+              <select id="workoutType" onchange="toggleManualFields()">
+                <option value="corrida">🏃‍♂️ Corrida</option>
+                <option value="mobilidade">🧘‍♂️ Mobilidade</option>
+                <option value="educativo">⚡ Educativos</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Título / Descrição</label>
+              <input type="text" id="title" placeholder="Ex: Alongamento de quadril" required>
+            </div>
+            <div class="form-group" id="field-distance">
+              <label>Distância (km)</label>
+              <input type="number" step="0.1" id="distanceKm" value="0.0" placeholder="0.0">
+            </div>
+            <div class="form-group">
+              <label>Duração (minutos)</label>
+              <input type="number" id="durationMinutes" placeholder="0" required>
+            </div>
+            <div class="form-group">
+              <label>Data do Treino</label>
+              <input type="date" id="activityDate" required>
+            </div>
+            <button type="submit" class="btn">Salvar Atividade</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('activityDate').valueAsDate = new Date();
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch('/api/workouts');
+        if (!response.ok) throw new Error('Erro ao carregar dados do servidor');
+        const data = await response.json();
+        
+        const workouts = Array.isArray(data) ? data : (data.workouts || []);
+        const profile = data.profile || { age: 39, currentWeight: 103, targetWeight: 90.0, objective: "perda_peso" };
+
+        const obj = profile.objective || "perda_peso";
+        const objectiveConfig = getObjectiveMatrix(obj);
+        const multiplier = objectiveConfig.multiplier;
+        const objectiveCustomText = objectiveConfig.text;
+
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        const startOfCurrentWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
+        startOfCurrentWeek.setHours(0, 0, 0, 0);
+
+        const endOfCurrentWeek = new Date(startOfCurrentWeek);
+        endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
+        endOfCurrentWeek.setHours(23, 59, 59, 999);
+
+        const startOfPreviousWeek = new Date(startOfCurrentWeek);
+        startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
+        
+        const endOfPreviousWeek = new Date(endOfCurrentWeek);
+        endOfPreviousWeek.setDate(endOfPreviousWeek.getDate() - 7);
+
+        const previousWeekKm = workouts
+          .filter(w => {
+            const isRun = (!w.type || w.type === 'corrida');
+            const wDate = new Date(w.activityDate || w.date);
+            return isRun && wDate >= startOfPreviousWeek && wDate <= endOfPreviousWeek;
+          })
+          .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
+
+        const currentWeekKm = workouts
+          .filter(w => {
+            const isRun = (!w.type || w.type === 'corrida');
+            const wDate = new Date(w.activityDate || w.date);
+            return isRun && wDate >= startOfCurrentWeek && wDate <= endOfCurrentWeek;
+          })
+          .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
+
+        const dynamicTargetKm = previousWeekKm * multiplier;
+        const basePaceSecs = calculateBasePace(workouts);
+
+        const weightDiff = profile.currentWeight - profile.targetWeight;
+        let projectionText = "Meta Atingida! 🎉";
+        
+        if (weightDiff > 0) {
+          const weeklyLossRate = 0.6; 
+          const estimatedWeeks = Math.ceil(weightDiff / weeklyLossRate);
+          projectionText = `Faltam ${weightDiff.toFixed(1)}kg (~${estimatedWeeks} semanas)`;
+        } else if (weightDiff < 0) {
+          projectionText = `Foco em ganho/manutenção`;
+        }
+
+        document.getElementById('subtitle-info').innerText = `Perfil Ativo (Idade: ${profile.age} anos) | Pace Base Calculado: ${formatPace(basePaceSecs)} /km`;
+        document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
+        document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
+        document.getElementById('m-objective').innerText = objectiveCustomText;
+        document.getElementById('m-weight').innerHTML = `${profile.currentWeight}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
+        
+        document.getElementById('rationale-box').innerHTML = objectiveConfig.rationale;
+
+        const sessionsContainer = document.getElementById('sessions-container');
+        sessionsContainer.innerHTML = objectiveConfig.sessions.map(s => {
+          const zoneClass = s.zone.toLowerCase();
+          
+          let detailsHtml = '';
+          if (s.isRun) {
+            const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
+            detailsHtml = `
+              <span>📏 Volume: <strong>${s.suggestedDist}</strong></span>
+              <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
+              <span>🎯 Esforço: <strong>${s.effort}</strong></span>
+            `;
+          } else {
+            detailsHtml = `
+              <span>⏱️ Duração: <strong>${s.duration || '30 min'}</strong></span>
+              <span>🎯 Foco: <strong>${s.effort}</strong></span>
+            `;
+          }
+
+          return `
+            <div class="card">
+              <div class="day">${s.dayOfWeek}</div>
+              <div class="type">
+                <span>${s.sessionType}</span>
+                <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
+              </div>
+              <div class="desc">${s.description}</div>
+              <div class="workout-details">
+                ${detailsHtml}
+              </div>
+              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">▶ YouTube: ${s.videoSearchTerm}</a>` : ''}
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Erro ao carregar dashboard do banco:', err);
+      }
+    }
+
+    function calculateBasePace(workouts) {
+      const runs = workouts.filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0 && (w.durationMinutes || w.duration) > 0);
+      if (runs.length === 0) return 420;
+
+      let totalSecsPerKm = 0;
+      runs.forEach(r => {
+        const dist = Number(r.distanceKm || r.distance);
+        const dur = Number(r.durationMinutes || r.duration);
+        const totalSecs = dur * 60;
+        totalSecsPerKm += (totalSecs / dist);
+      });
+
+      return totalSecsPerKm / runs.length;
+    }
+
+    function formatPace(secondsPerKm) {
+      const mins = Math.floor(secondsPerKm / 60);
+      const secs = Math.round(secondsPerKm % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function getPaceRangeForZone(baseSecs, zone) {
+      let minMultiplier = 1.0;
+      let maxMultiplier = 1.0;
+
+      if (zone === 'Z1') { minMultiplier = 1.15; maxMultiplier = 1.30; }
+      else if (zone === 'Z2') { minMultiplier = 1.05; maxMultiplier = 1.15; }
+      else if (zone === 'Z3') { minMultiplier = 0.95; maxMultiplier = 1.04; }
+      else if (zone === 'Z4') { minMultiplier = 0.85; maxMultiplier = 0.94; }
+      else if (zone === 'Z5') { minMultiplier = 0.75; maxMultiplier = 0.84; }
+      else { return 'Livre'; }
+
+      const paceMin = formatPace(baseSecs * minMultiplier);
+      const paceMax = formatPace(baseSecs * maxMultiplier);
+      return `${paceMin} - ${paceMax} /km`;
+    }
+
+    function getObjectiveMatrix(objective) {
+      if (objective === "5km") {
+        return {
+          multiplier: 1.05,
+          text: "Meta: 5 km (Velocidade)",
+          rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
+          sessions: [
+            { dayOfWeek: "Segunda", sessionType: "Mobilidade Articular", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Amplitude de passada e flexibilidade de quadril.", effort: "Soltura articular", videoSearchTerm: "Mobilidade para corredores 5km" },
+            { dayOfWeek: "Terça", sessionType: "Tiros / Intervalado Curto", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: "5.0 km", description: "Séries rápidas para ganho de velocidade pura.", effort: "Respiração muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade" },
+            { dayOfWeek: "Quarta", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: "3.5 km", description: "Soltura leve em ritmo conversacional.", effort: "Ritmo bem confortável", videoSearchTerm: "Rodagem leve recuperação corrida" },
+            { dayOfWeek: "Quinta", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: "6.0 km", description: "Blocos contínuos na meta de velocidade pretendida.", effort: "Sustentado e desafiador", videoSearchTerm: "Como baixar o tempo nos 5km" },
+            { dayOfWeek: "Sexta", sessionType: "Descanso Ativo / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular e liberação leve.", effort: "Soltura muscular", videoSearchTerm: "Liberação miofascial corredores" },
+            { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Aeróbico Moderado", isRun: true, suggestedDist: "7.5 km", description: "Base aeróbica para sustentação de ritmo.", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado corrida" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa.", effort: "Repouso total", videoSearchTerm: "" }
+          ]
+        };
+      } else {
+        return {
+          multiplier: 1.08,
+          text: "Perda de Peso Progressiva",
+          rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).",
+          sessions: [
+            { dayOfWeek: "Segunda", sessionType: "Mobilidade", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Sessão regenerativa e foco em amplitude.", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores" },
+            { dayOfWeek: "Terça", sessionType: "Corrida Leve (Z2)", zone: "Z2", zoneDesc: "Queima de Gordura", isRun: true, suggestedDist: "5.0 km", description: "Rodagem aeróbica contínua em ritmo conversacional.", effort: "Conversacional", videoSearchTerm: "Educativos de corrida" },
+            { dayOfWeek: "Quarta", sessionType: "Educativos", zone: "Z1", zoneDesc: "Técnica", isRun: false, duration: "25 min", description: "Drills de técnica de passada.", effort: "Coordenação", videoSearchTerm: "Drills de corrida" },
+            { dayOfWeek: "Quinta", sessionType: "Rodagem / Intervalado", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: "6.0 km", description: "Estímulo para gasto calórico.", effort: "Moderado", videoSearchTerm: "Treino intervalado para emagrecer" },
+            { dayOfWeek: "Sexta", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação ativa.", effort: "Soltura", videoSearchTerm: "Liberação miofascial" },
+            { dayOfWeek: "Sábado", sessionType: "Longo de Base", zone: "Z2", zoneDesc: "Aeróbico Extendido", isRun: true, suggestedDist: "9.0 km", description: "Rodagem longa para consumo de gordura.", effort: "Constante", videoSearchTerm: "Treino longo para perda de peso" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Descanso total.", effort: "Repouso", videoSearchTerm: "" }
+          ]
+        };
+      }
+    }
+
+    function toggleManualFields() {
+      const type = document.getElementById('workoutType').value;
+      const distanceField = document.getElementById('field-distance');
+      distanceField.style.display = (type === 'mobilidade' || type === 'educativo') ? 'none' : 'block';
+    }
+
+    async function submitWorkout(event) {
+      event.preventDefault();
+      const type = document.getElementById('workoutType').value;
+      const distance = parseFloat(document.getElementById('distanceKm').value) || 0;
+      
+      const newWorkout = {
+        title: document.getElementById('title').value,
+        distanceKm: type === 'mobilidade' || type === 'educativo' ? 0 : distance,
+        durationMinutes: parseInt(document.getElementById('durationMinutes').value),
+        activityDate: document.getElementById('activityDate').value,
+        type: type
+      };
+
+      try {
+        const response = await fetch('/api/workouts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newWorkout)
+        });
+
+        if (!response.ok) throw new Error('Erro ao salvar no banco de dados');
+
+        document.getElementById('workout-form').reset();
+        document.getElementById('activityDate').valueAsDate = new Date();
+        document.getElementById('workoutType').value = 'corrida';
+        toggleManualFields();
+        
+        loadDashboard();
+        alert('Atividade salva com sucesso diretamente no banco de dados!');
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao salvar atividade no servidor.');
+      }
+    }
+
+    async function uploadGpx(event) {
+      event.preventDefault();
+      const fileInput = document.getElementById('gpxFiles');
+      
+      if (fileInput.files.length === 0) {
+        alert('Selecione pelo menos um arquivo GPX.');
+        return;
+      }
+
+      const formData = new FormData();
+      for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append('files', fileInput.files[i]);
+      }
+
+      try {
+        const response = await fetch('/api/workouts/upload-gpx', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao importar arquivos GPX');
+        }
+
+        loadDashboard();
+        alert(`${fileInput.files.length} arquivo(s) GPX importado(s) com sucesso!`);
+        document.getElementById('gpx-form').reset();
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao enviar arquivo GPX: ' + err.message);
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

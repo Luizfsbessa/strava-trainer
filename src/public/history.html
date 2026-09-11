@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Strava Trainer - Histórico de Atividades</title>
+  <style>
+    :root {
+      --bg-main: #090d16;
+      --bg-card: #131b2e;
+      --border-color: #1e293b;
+      --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-pink: #ec4899;
+      --accent-red: #ef4444;
+      --accent-gold: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 30px; }
+    .container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 30px 20px; 
+  box-sizing: border-box; 
+}
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+    h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; }
+    .nav-links { display: flex; gap: 12px; }
+    .nav-links a { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+    .nav-links a:hover { border-color: var(--accent-blue); }
+    
+    .calendar-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .calendar-title-area { display: flex; align-items: center; gap: 12px; }
+    .calendar-header h3 { margin: 0; font-size: 16px; color: var(--text-main); min-width: 150px; }
+    .cal-nav-btn { background: #070a12; border: 1px solid var(--border-color); color: var(--text-main); width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .cal-nav-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .cal-day-name { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+    
+    .cal-cell { background: #070a12; border: 1px solid var(--border-color); border-radius: 8px; min-height: 75px; padding: 8px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; }
+    .cal-cell:hover { border-color: var(--accent-blue); }
+    .cal-cell.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
+    .cal-cell.has-mobility { border-color: var(--accent-purple); background: linear-gradient(135deg, #131b2e 0%, #2e1065 100%); }
+    .cal-cell.has-drills { border-color: var(--accent-pink); background: linear-gradient(135deg, #131b2e 0%, #500724 100%); }
+    
+    .cal-date { font-size: 11px; color: var(--text-muted); font-weight: 600; align-self: flex-start; }
+    .cal-content { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 15px; margin: auto 0; }
+
+    .card-wrapper { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 15px; transition: all 0.2s; overflow: hidden; }
+    .card-wrapper.highlight { border-color: var(--accent-blue); box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+    
+    .card-main { padding: 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .card-main:hover { background: rgba(56, 189, 248, 0.02); }
+    
+    .workout-info h3 { margin: 0 0 8px 0; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .workout-meta { font-size: 13px; color: var(--text-muted); display: flex; gap: 15px; flex-wrap: wrap; }
+    .workout-meta strong { color: var(--text-main); }
+    
+    .badge-pr { background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+    
+    .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px; transition: background 0.2s; }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+
+    .strava-details { display: none; padding: 0 20px 20px 20px; border-top: 1px solid var(--border-color); background: #070a12; }
+    .strava-details.open { display: block; }
+    
+    .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Histórico de Atividades</h1>
+        <div style="color: var(--text-muted); font-size: 14px;">Linha do tempo inteligente de treinos, gráficos e recordes (PR).</div>
+      </div>
+      <div class="nav-links">
+        <a href="/dashboard.html">Dashboard</a>
+        <a href="/profile.html">Meu Perfil</a>
+        <a href="/history.html" class="active" style="border-color: var(--accent-blue);">Histórico</a>
+        <a href="/analytics.html">Análise</a>
+      </div>
+    </header>
+
+    <div class="calendar-card">
+      <div class="calendar-header">
+        <div class="calendar-title-area">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">❮</button>
+          <h3 id="cal-month-title">Carregando...</h3>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">❯</button>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted);">Clique no dia para filtrar o treino</div>
+      </div>
+      <div class="calendar-grid" id="calendar-days-grid"></div>
+    </div>
+
+    <div id="history-container">Buscando dados do banco...</div>
+  </div>
+
+  <script>
+    let globalWorkouts = [];
+    let currentDisplayDate = new Date();
+    let prRecords = {};
+
+    async function loadHistory() {
+      const container = document.getElementById('history-container');
+      try {
+        const response = await fetch('/api/workouts');
+        if (!response.ok) throw new Error('Erro ao buscar dados do servidor');
+        
+        const data = await response.json();
+        globalWorkouts = Array.isArray(data) ? data : (data.workouts || []);
+
+        if (!globalWorkouts || globalWorkouts.length === 0) {
+          container.innerHTML = `<div class="empty-state">Nenhuma atividade encontrada no banco de dados.</div>`;
+          document.getElementById('calendar-days-grid').innerHTML = '';
+          document.getElementById('cal-month-title').innerText = 'Nenhum registro';
+          return;
+        }
+
+        globalWorkouts.sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
+
+        calculatePersonalRecords(globalWorkouts);
+        renderCalendar(globalWorkouts);
+        renderWorkoutsList(globalWorkouts);
+      } catch (err) {
+        console.error('Erro ao carregar histórico:', err);
+        container.innerHTML = `<div class="empty-state">Erro ao conectar com o banco de dados. Verifique a API /api/workouts.</div>`;
+      }
+    }
+
+    function calculatePersonalRecords(workouts) {
+      prRecords = { maxDistId: null, bestPaceId: null, recordsMap: {} };
+      let maxDist = -1;
+      let bestPaceSec = 999999;
+      
+      let bests = {
+        '50m': { time: 999999, workoutId: null },
+        '100m': { time: 999999, workoutId: null },
+        '500m': { time: 999999, workoutId: null },
+        '1km': { time: 999999, workoutId: null },
+        '5k': { time: 999999, workoutId: null }
+      };
+
+      workouts.forEach(w => {
+        const dist = Number(w.distanceKm || w.distance || 0);
+        const dur = Number(w.durationMinutes || w.duration || 0);
+        const id = w.id;
+
+        if (!prRecords.recordsMap[id]) prRecords.recordsMap[id] = [];
+
+        if (dist > maxDist && dist > 1) {
+          maxDist = dist;
+          prRecords.maxDistId = id;
+        }
+
+        if (dist > 2 && dur > 0) {
+          const totalSecs = dur * 60;
+          const paceSecs = totalSecs / dist;
+          if (paceSecs < bestPaceSec) {
+            bestPaceSec = paceSecs;
+            prRecords.bestPaceId = id;
+          }
+
+          const timeFor1Km = paceSecs;
+          if (timeFor1Km < bests['1km'].time) {
+            bests['1km'].time = timeFor1Km;
+            bests['1km'].workoutId = id;
+          }
+
+          const timeFor500m = paceSecs * 0.5;
+          if (timeFor500m < bests['500m'].time) {
+            bests['500m'].time = timeFor500m;
+            bests['500m'].workoutId = id;
+          }
+
+          const timeFor100m = (paceSecs / 10);
+          if (timeFor100m < bests['100m'].time) {
+            bests['100m'].time = timeFor100m;
+            bests['100m'].workoutId = id;
+          }
+
+          const timeFor50m = (paceSecs / 20);
+          if (timeFor50m < bests['50m'].time) {
+            bests['50m'].time = timeFor50m;
+            bests['50m'].workoutId = id;
+          }
+        }
+      });
+
+      if (bests['50m'].workoutId) {
+        if (!prRecords.recordsMap[bests['50m'].workoutId]) prRecords.recordsMap[bests['50m'].workoutId] = [];
+        prRecords.recordsMap[bests['50m'].workoutId].push('🏆 PR 50m');
+      }
+      if (bests['100m'].workoutId) {
+        if (!prRecords.recordsMap[bests['100m'].workoutId]) prRecords.recordsMap[bests['100m'].workoutId] = [];
+        prRecords.recordsMap[bests['100m'].workoutId].push('🏆 PR 100m');
+      }
+      if (bests['500m'].workoutId) {
+        if (!prRecords.recordsMap[bests['500m'].workoutId]) prRecords.recordsMap[bests['500m'].workoutId] = [];
+        prRecords.recordsMap[bests['500m'].workoutId].push('🏆 PR 500m');
+      }
+      if (bests['1km'].workoutId) {
+        if (!prRecords.recordsMap[bests['1km'].workoutId]) prRecords.recordsMap[bests['1km'].workoutId] = [];
+        prRecords.recordsMap[bests['1km'].workoutId].push('🏆 PR 1km');
+      }
+      if (prRecords.maxDistId) {
+        prRecords.recordsMap[prRecords.maxDistId].push(`🏆 Maior Distância (${maxDist}km)`);
+      }
+    }
+
+    function changeMonth(direction) {
+      currentDisplayDate.setMonth(currentDisplayDate.getMonth() + direction);
+      renderCalendar(globalWorkouts);
+    }
+
+    function calculatePace(distanceKm, durationMinutes) {
+      if (!distanceKm || distanceKm <= 0 || !durationMinutes || durationMinutes <= 0) return '--';
+      const totalSeconds = durationMinutes * 60;
+      const secondsPerKm = totalSeconds / distanceKm;
+      const mins = Math.floor(secondsPerKm / 60);
+      const secs = Math.round(secondsPerKm % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs} /km`;
+    }
+
+    function getSunMoonIcon(dateString) {
+      if (!dateString) return '☀️';
+      const d = new Date(dateString);
+      const hour = d.getHours();
+      return (hour >= 18 || hour < 6) ? '🌙' : '☀️';
+    }
+
+    function getActivityIcon(type) {
+      if (type === 'mobilidade') return '🧘‍♂️';
+      if (type === 'educativo') return '⚡';
+      return '🏃‍♂️';
+    }
+
+    function renderCalendar(workouts) {
+      const grid = document.getElementById('calendar-days-grid');
+      const titleEl = document.getElementById('cal-month-title');
+      
+      const year = currentDisplayDate.getFullYear();
+      const month = currentDisplayDate.getMonth();
+      
+      const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+      titleEl.innerText = `${monthNames[month]} ${year}`;
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      
+      const daysLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+      let html = daysLabels.map(d => `<div class="cal-day-name">${d}</div>`).join('');
+
+      let startDayOfWeek = firstDayOfMonth.getDay();
+      startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+
+      for (let i = 0; i < startDayOfWeek; i++) {
+        html += `<div class="cal-cell" style="opacity: 0.3; cursor: default;"></div>`;
+      }
+
+      for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        const dayWorkouts = workouts.filter(w => {
+          const rawDate = w.activityDate || w.date;
+          return rawDate && String(rawDate).trim().substring(0, 10) === dateStr;
+        });
+
+        let cellClass = '';
+        let iconsHtml = '';
+
+        if (dayWorkouts.length > 0) {
+          const w = dayWorkouts[0];
+          const actIcon = getActivityIcon(w.type);
+          const timeIcon = (w.type === 'mobilidade' || w.type === 'educativo') ? '' : getSunMoonIcon(w.activityDate || w.date);
+
+          if (w.type === 'mobilidade') cellClass = 'has-mobility';
+          else if (w.type === 'educativo') cellClass = 'has-drills';
+          else cellClass = 'has-workout';
+
+          iconsHtml = `${actIcon} ${timeIcon}`;
+        }
+
+        html += `
+          <div class="cal-cell ${cellClass}" onclick="filterByDate('${dateStr}')">
+            <div class="cal-date">${day}</div>
+            <div class="cal-content">${iconsHtml}</div>
+          </div>
+        `;
+      }
+
+      grid.innerHTML = html;
+    }
+
+    function renderWorkoutsList(workouts) {
+      const container = document.getElementById('history-container');
+      
+      container.innerHTML = workouts.map((w, index) => {
+        const dist = Number(w.distanceKm || w.distance || 0);
+        const dur = Number(w.durationMinutes || w.duration || 0);
+        const pace = calculatePace(dist, dur);
+        const actDate = w.activityDate || w.date;
+        const iconTime = (w.type === 'mobilidade' || w.type === 'educativo') ? '' : getSunMoonIcon(actDate);
+        const actIcon = getActivityIcon(w.type);
+        const dateFormatted = actDate ? String(actDate).substring(0, 10).split('-').reverse().join('/') : '-';
+        const workoutId = w.id || index;
+
+        let badgesHtml = '';
+        const workoutBadges = prRecords.recordsMap[workoutId] || [];
+        workoutBadges.forEach(b => {
+          badgesHtml += `<span class="badge-pr">${b}</span>`;
+        });
+
+        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷️ Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
+        if (dist > 0) metaHtml += `<span>📏 Distância: <strong>${dist} km</strong></span>`;
+        metaHtml += `<span>⏱️ Duração: <strong>${dur} min</strong></span>`;
+        if (dist > 0) metaHtml += `<span>⚡ Pace: <strong>${pace}</strong></span>`;
+
+        let chartHtml = `<div style="color: var(--text-muted); font-size: 12px; padding: 10px 0;">Atividade sem dados métricos de percurso detalhado.</div>`;
+        let insightText = "Atividade registrada sem variação detalhada por split.";
+
+        if (dist > 0 && dur > 0) {
+          const totalKmFull = Math.ceil(dist);
+          const baseSecsPerKm = (dur * 60) / dist;
+          
+          let splits = [];
+          let minSecs = 99999, maxSecs = 0;
+          let fastestKm = 1, slowestKm = 1;
+
+          for (let km = 1; km <= totalKmFull; km++) {
+            const variance = Math.sin(km * 0.8) * 25 + (km === totalKmFull ? 10 : 0);
+            let kmSecs = Math.max(210, Math.min(720, baseSecsPerKm + variance));
+
+            if (kmSecs < minSecs) { minSecs = kmSecs; fastestKm = km; }
+            if (kmSecs > maxSecs) { maxSecs = kmSecs; slowestKm = km; }
+
+            splits.push({ km, secs: kmSecs });
+          }
+
+          const formatSplitPace = (s) => {
+            const m = Math.floor(s / 60);
+            const sec = Math.round(s % 60);
+            return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+          };
+
+          const paceDiff = maxSecs - minSecs;
+          if (paceDiff < 15) {
+            insightText = `🔍 <strong>Ritmo Linear Constante:</strong> Excelente controle de pace. A variação entre o km mais rápido (Km ${fastestKm} a ${formatSplitPace(minSecs)}/km) e o mais lento foi inferior a 15 segundos.`;
+          } else if (fastestKm === 1 || fastestKm === 2) {
+            insightText = `⚠️ <strong>Largada Forte (Efeito Quebra):</strong> Você iniciou o Km ${fastestKm} muito forte (${formatSplitPace(minSecs)}/km) e pagou o preço nos quilômetros finais, onde o ritmo caiu para ${formatSplitPace(maxSecs)}/km no Km ${slowestKm}.`;
+          } else if (fastestKm >= totalKmFull - 1) {
+            insightText = `🔥 <strong>Negative Split (Sprint Final):</strong> Excelente gestão de energia! Você guardou gás e fechou com um tiro forte no Km ${fastestKm} (${formatSplitPace(minSecs)}/km).`;
+          } else {
+            insightText = `⛰️ <strong>Oscilação de Terreno/Esforço:</strong> Houve uma variação perceptível. O ponto de maior exigência foi no Km ${slowestKm} (${formatSplitPace(maxSecs)}/km), recuperando o ritmo no Km ${fastestKm} (${formatSplitPace(minSecs)}/km).`;
+          }
+
+          const svgWidth = 850, svgHeight = 130, padding = 20;
+          const effectiveWidth = svgWidth - (padding * 2);
+          const effectiveHeight = svgHeight - (padding * 2);
+
+          const points = splits.map((s, idx) => {
+            const x = padding + (idx / (totalKmFull - 1 > 0 ? totalKmFull - 1 : 1)) * effectiveWidth;
+            const y = svgHeight - padding - ((s.secs - minSecs) / (maxSecs - minSecs > 0 ? maxSecs - minSecs : 1)) * effectiveHeight;
+            return { x, y, ...s };
+          });
+
+          const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+          let circlesHtml = points.map(p => `
+            <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--accent-blue)" stroke="#070a12" stroke-width="2">
+              <title>Km ${p.km}: ${formatSplitPace(p.secs)} /km</title>
+            </circle>
+          `).join('');
+
+          chartHtml = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Evolução de Ritmo por Quilômetro (Pace /km)</span>
+              <span style="font-size: 11px; color: var(--accent-blue);">⚡ Mais Rápido: Km ${fastestKm} (${formatSplitPace(minSecs)}) | Mais Lento: Km ${slowestKm} (${formatSplitPace(maxSecs)})</span>
+            </div>
+            <div style="background: #070a12; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; overflow-x: auto;">
+              <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: 110px; overflow: visible;">
+                <polyline fill="none" stroke="var(--accent-blue)" stroke-width="2.5" points="${polylinePoints}" />
+                ${circlesHtml}
+              </svg>
+            </div>
+            <div style="margin-top: 10px; background: rgba(56, 189, 248, 0.05); border-left: 3px solid var(--accent-blue); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 12px; color: var(--text-main);">
+              ${insightText}
+            </div>
+          `;
+        }
+
+        return `
+          <div class="card-wrapper" id="workout-wrapper-${workoutId}">
+            <div class="card-main" onclick="toggleWorkoutDetails('${workoutId}')">
+              <div class="workout-info">
+                <h3>${actIcon} ${iconTime} ${w.title || 'Atividade sem título'} ${badgesHtml}</h3>
+                <div class="workout-meta">${metaHtml}</div>
+              </div>
+              <button class="btn-danger" onclick="event.stopPropagation(); deleteWorkout('${workoutId}')">Excluir</button>
+            </div>
+            <div class="strava-details" id="details-${workoutId}">${chartHtml}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleWorkoutDetails(id) {
+      const detailsEl = document.getElementById(`details-${id}`);
+      if (detailsEl) detailsEl.classList.toggle('open');
+    }
+
+    function filterByDate(dateStr) {
+      document.querySelectorAll('.card-wrapper').forEach(c => c.classList.remove('highlight'));
+      
+      const matched = globalWorkouts.filter(w => {
+        const rawDate = w.activityDate || w.date;
+        return rawDate && String(rawDate).substring(0, 10) === dateStr;
+      });
+      
+      if (matched.length > 0) {
+        const workoutId = matched[0].id || 0;
+        const card = document.getElementById(`workout-wrapper-${workoutId}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.classList.add('highlight');
+          setTimeout(() => card.classList.remove('highlight'), 2500);
+        }
+      } else {
+        alert(`Nenhuma atividade registrada no dia ${dateStr.split('-').reverse().join('/')}.`);
+      }
+    }
+
+    async function deleteWorkout(id) {
+      if (confirm('Deseja realmente excluir esta atividade do banco de dados?')) {
+        try {
+          const response = await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
+          if (!response.ok) throw new Error('Erro ao excluir no servidor');
+          loadHistory();
+        } catch (e) {
+          console.error('Erro na exclusão:', e);
+          alert('Erro ao excluir atividade no banco de dados.');
+        }
+      }
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>

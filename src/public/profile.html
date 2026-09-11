@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Strava Trainer - Meu Perfil e Objetivos</title>
+  <style>
+    :root {
+      --bg-main: #090d16;
+      --bg-card: #131b2e;
+      --border-color: #1e293b;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 30px; }
+    .container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 30px 20px; 
+  box-sizing: border-box; 
+}
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+    h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; }
+    .nav-links { display: flex; gap: 12px; }
+    .nav-links a { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+    .nav-links a:hover { border-color: var(--accent-blue); }
+    
+    .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+    input, select { width: 100%; padding: 12px; background: #070a12; border: 1px solid var(--border-color); color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    input:focus, select:focus { outline: none; border-color: var(--accent-blue); }
+    .age-preview { font-size: 12px; color: var(--accent-blue); margin-top: 5px; font-weight: 600; }
+    .btn { background: var(--accent-green); color: white; border: none; padding: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; font-size: 15px; transition: background 0.2s; }
+    .btn:hover { background: #059669; }
+
+    .zones-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .zones-table th, .zones-table td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
+    .zones-table th { color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    .zone-pill { padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Configuração de Perfil</h1>
+        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de esforço.</div>
+      </div>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="profile.html" style="border-color: var(--accent-blue);">Meu Perfil</a>
+        <a href="history.html">Histórico</a>
+        <a href="analytics.html">Análise</a>
+      </div>
+    </header>
+
+    <div class="card">
+      <form id="profile-form" onsubmit="saveProfile(event)">
+        <div class="form-group">
+          <label>Data de Nascimento</label>
+          <input type="date" id="pBirthDate" required onchange="onBirthDateChange()">
+          <div id="agePreviewText" class="age-preview">Idade calculada automaticamente: -- anos</div>
+        </div>
+        <div class="form-group">
+          <label>Peso Atual (kg)</label>
+          <input type="number" step="0.1" id="pWeight" required>
+        </div>
+        <div class="form-group">
+          <label>Peso Meta / Alvo (kg)</label>
+          <input type="number" step="0.1" id="pTargetWeight" required placeholder="Ex: 88.0">
+        </div>
+        <div class="form-group">
+          <label>🎯 Objetivo Principal de Treinamento</label>
+          <select id="pObjective">
+            <option value="perda_peso">Perda de Peso Progressiva (Foco em Déficit e Composição)</option>
+            <option value="5km">Concluir / Baixar Tempo nos 5 km</option>
+            <option value="10km">Concluir / Baixar Tempo nos 10 km</option>
+            <option value="folego">Ganho de Fôlego / Melhora de VO2Max</option>
+            <option value="15km">Concluir Prova de 15 km</option>
+            <option value="meia_maratona">Meia Maratona (21.1 km)</option>
+            <option value="maratona">Maratona Completa (42.2 km)</option>
+            <option value="hipertrofia">Ganho de Massa Muscular / Hipertrofia</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">Salvar Alterações e Atualizar Algoritmo</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">⚡ Suas Zonas de Frequência Cardíaca</div>
+      <div id="fcmax-subtitle" style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Calculando com base na data de nascimento...</div>
+      <table class="zones-table">
+        <thead>
+          <tr>
+            <th>Zona</th>
+            <th>Intensidade</th>
+            <th>% da FCMax</th>
+            <th>BPM Estimado</th>
+            <th>Objetivo</th>
+          </tr>
+        </thead>
+        <tbody id="zones-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    function calculateAge(birthDateString) {
+      if (!birthDateString) return 39;
+      const birthDate = new Date(birthDateString);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    }
+
+    function updateZonesTable(age) {
+      const fcMax = 220 - age;
+      document.getElementById('fcmax-subtitle').innerText = `Baseado na sua idade (${age} anos) • FCMax estimada: ${fcMax} bpm (Fórmula: 220 - idade)`;
+
+      const zones = [
+        { name: 'Z1', label: 'Regenerativo / Muito Leve', pct: '50% - 60%', color: '#38bdf8', goal: 'Recuperação ativa' },
+        { name: 'Z2', label: 'Aeróbico / Queima de Gordura', pct: '60% - 70%', color: '#10b981', goal: 'Base e longões' },
+        { name: 'Z3', label: 'Moderado / Ritmo Sustentado', pct: '70% - 80%', color: '#f59e0b', goal: 'Ritmo de prova' },
+        { name: 'Z4', label: 'Limiar Anaeróbico / Duro', pct: '80% - 90%', color: '#f97316', goal: 'Expansão de limiar' },
+        { name: 'Z5', label: 'VO2Max / Esforço Máximo', pct: '90% - 100%', color: '#ef4444', goal: 'Tiros e velocidade' }
+      ];
+
+      const tbody = document.getElementById('zones-tbody');
+      tbody.innerHTML = zones.map(z => {
+        const minBpm = Math.round(fcMax * (parseInt(z.pct.split(' - ')[0]) / 100));
+        const maxBpm = Math.round(fcMax * (parseInt(z.pct.split(' - ')[1]) / 100));
+        return `
+          <tr>
+            <td><span class="zone-pill" style="background: ${z.color}25; color: ${z.color}; border: 1px solid ${z.color}50;">${z.name}</span></td>
+            <td><strong>${z.label}</strong></td>
+            <td>${z.pct}</td>
+            <td>${minBpm} - ${maxBpm} bpm</td>
+            <td style="color: var(--text-muted);">${z.goal}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function onBirthDateChange() {
+      const val = document.getElementById('pBirthDate').value;
+      if (val) {
+        const calculatedAge = calculateAge(val);
+        document.getElementById('agePreviewText').innerText = `Idade calculada automaticamente: ${calculatedAge} anos`;
+        updateZonesTable(calculatedAge);
+      } else {
+        document.getElementById('agePreviewText').innerText = `Idade calculada automaticamente: -- anos`;
+      }
+    }
+
+    function loadProfile() {
+      const saved = localStorage.getItem('strava_trainer_state');
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.profile) {
+          let defaultBirth = '1987-01-01';
+          if (data.profile.birthDate) {
+            defaultBirth = data.profile.birthDate;
+          } else if (data.profile.age) {
+            const currentYear = new Date().getFullYear();
+            const estimatedYear = currentYear - data.profile.age;
+            defaultBirth = `${estimatedYear}-01-01`;
+          }
+
+          document.getElementById('pBirthDate').value = defaultBirth;
+          document.getElementById('pWeight').value = data.profile.currentWeight || 103;
+          document.getElementById('pTargetWeight').value = data.profile.targetWeight || 92.7;
+          document.getElementById('pObjective').value = data.profile.objective || "perda_peso";
+          
+          onBirthDateChange();
+        }
+      }
+    }
+
+    function saveProfile(event) {
+      event.preventDefault();
+      const saved = localStorage.getItem('strava_trainer_state');
+      let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
+
+      if (!data.profile) data.profile = {};
+      
+      const birthDateVal = document.getElementById('pBirthDate').value;
+      
+      data.profile.birthDate = birthDateVal;
+      data.profile.age = calculateAge(birthDateVal);
+      data.profile.currentWeight = parseFloat(document.getElementById('pWeight').value);
+      data.profile.targetWeight = parseFloat(document.getElementById('pTargetWeight').value);
+      data.profile.objective = document.getElementById('pObjective').value;
+
+      localStorage.setItem('strava_trainer_state', JSON.stringify(data));
+      alert('Perfil atualizado com sucesso! Zonas de esforço e parâmetros recalculados.');
+      window.location.href = 'dashboard.html';
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

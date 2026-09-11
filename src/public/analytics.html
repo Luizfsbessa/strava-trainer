@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strava Trainer - Análise de Desempenho</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <!-- Importação do Motor de Inteligência Isolado -->
+    <script src="/js/analyticsEngine.js"></script>
+    <style>
+        :root {
+            --bg-main: #090d16;
+            --bg-card: #131b2e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-red: #ef4444;
+            --border: #1e293b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); padding: 30px; }
+        .container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 30px 20px; 
+  box-sizing: border-box; 
+}
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+        h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; letter-spacing: -0.5px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; }
+        .nav-links { display: flex; gap: 12px; }
+        .nav-links a { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; transition: border-color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { border-color: var(--accent-blue); }
+        .grid-dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+        .card h3 { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .card .value { font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; }
+        .card .subtext { font-size: 12px; color: var(--text-muted); }
+        .status-banner { background-color: var(--bg-card); border-left: 5px solid var(--accent-blue); padding: 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid var(--border); }
+        .status-banner.ZONA_OTIMA { border-left-color: var(--accent-green); }
+        .status-banner h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); }
+        .status-banner p { color: var(--text-muted); font-size: 14px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .section-title { font-size: 18px; font-weight: 700; color: var(--text-main); margin: 0; }
+        .current-week-badge { background-color: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+        .calendar-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 16px; }
+        .day-card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px; cursor: pointer; transition: all 0.2s ease; }
+        .day-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+        .day-card.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
+        .day-card.active-audit { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+        .day-card.today { box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+        .day-name { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .day-date { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+        .day-icon { font-size: 18px; margin: 4px 0; }
+        .day-km { font-size: 14px; font-weight: 800; color: var(--accent-blue); }
+
+        /* Acordeão de Auditoria por Clique */
+        .workout-audit-drawer { background: var(--bg-card); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); display: none; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .audit-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+        .audit-title { font-size: 16px; font-weight: 700; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+        .audit-hint { font-size: 12px; color: var(--text-muted); }
+        .audit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .audit-item { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+        .audit-item h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .audit-item p { font-size: 13px; color: var(--text-main); line-height: 1.4; }
+
+        /* Coach Virtual */
+        .coach-verdict-card { background: linear-gradient(135deg, #131b2e 0%, #1e1b4b 100%); border: 1px solid var(--accent-purple); border-radius: 12px; padding: 24px; margin-bottom: 30px; position: relative; }
+        .coach-verdict-card h3 { color: var(--accent-purple); font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .coach-verdict-card p { color: var(--text-main); font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
+        .coach-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+        .coach-col { background: rgba(0, 0, 0, 0.2); padding: 14px; border-radius: 8px; border-left: 3px solid var(--accent-purple); }
+        .coach-col.positives { border-left-color: var(--accent-green); }
+        .coach-col.negatives { border-left-color: var(--accent-yellow); }
+        .coach-col h5 { font-size: 12px; text-transform: uppercase; margin-bottom: 6px; color: var(--text-muted); }
+        .coach-col ul { padding-left: 16px; font-size: 13px; color: var(--text-main); }
+        .coach-col li { margin-bottom: 4px; }
+
+        .chart-container { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 30px; position: relative; height: 280px; }
+        .pr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+        .pr-card { background: linear-gradient(135deg, #131b2e 0%, #1e293b 100%); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; overflow: hidden; }
+        .pr-card::after { content: "🏆"; position: absolute; right: 14px; top: 14px; font-size: 20px; opacity: 0.2; }
+
+        @media (max-width: 768px) {
+            .grid-dashboard, .pr-grid { grid-template-columns: repeat(2, 1fr); }
+            .calendar-week-grid, .audit-grid, .coach-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Painel de Análise e Progressão</h1>
+                <div class="subtitle">Monitoramento de carga ACWR e recordes pessoais estimados via banco de dados.</div>
+            </div>
+            <div class="nav-links">
+                <a href="/dashboard.html">Dashboard</a>
+                <a href="/profile.html">Meu Perfil</a>
+                <a href="/history.html">Histórico</a>
+                <a href="/analytics.html" class="active">Análise</a>
+            </div>
+        </header>
+
+        <div id="status-container" class="status-banner">
+            <h2>Carregando inteligência do motor...</h2>
+            <p>Processando métricas de carga e volume direto do banco de dados.</p>
+        </div>
+
+        <div class="grid-dashboard">
+            <div class="card"><h3>Volume Semana Passada</h3><div class="value" id="val-last-week-km">0.0 km</div><div class="subtext" id="val-change">Baseado em registros</div></div>
+            <div class="card"><h3>Carga Aguda (7d)</h3><div class="value" id="val-acute">0</div><div class="subtext">Estresse recente</div></div>
+            <div class="card"><h3>Carga Crônica (28d)</h3><div class="value" id="val-chronic">0</div><div class="subtext">Base aeróbica</div></div>
+            <div class="card"><h3>Razão ACWR</h3><div class="value" id="val-acwr">1.0</div><div class="subtext">Risco de lesão</div></div>
+        </div>
+
+        <div class="section-header">
+            <div class="section-title">📅 Rastreio da Semana Atual (Seg - Dom)</div>
+            <div class="current-week-badge" id="current-week-total">Acumulado: 0.0 km</div>
+        </div>
+        <div class="calendar-week-grid" id="calendar-grid"></div>
+
+        <!-- Acordeão Inteligente (Toggle por Clique) -->
+        <div id="workout-audit-drawer" class="workout-audit-drawer">
+            <div class="audit-header">
+                <div class="audit-title" id="audit-drawer-title">⚡ Auditoria Clínica do Treino</div>
+            </div>
+            <div class="audit-grid">
+                <div class="audit-item"><h4>🔄 Compliance de Ordem (Inversão)</h4><p id="audit-compliance">Analisando alinhamento com a agenda...</p></div>
+                <div class="audit-item"><h4>📈 Volume & Intensidade</h4><p id="audit-volume">Calculando superávit ou déficit...</p></div>
+                <div class="audit-item"><h4>⚡ Execução & Ritmo</h4><p id="audit-pace">Avaliando consistência de pace...</p></div>
+                <div class="audit-item"><h4>💡 Sugestão de Reencaixe (Smart Fix)</h4><p id="audit-fix">Verificando janelas de recuperação...</p></div>
+            </div>
+        </div>
+
+        <!-- Veredito do Coach -->
+        <div class="coach-verdict-card" id="coach-verdict-section">
+            <h3>🤖 Veredito do Coach Virtual (Fechamento da Semana)</h3>
+            <p id="coach-summary-text">Processando feedback comportamental e de carga dos últimos 7 dias...</p>
+            <div class="coach-grid">
+                <div class="coach-col positives"><h5>✨ Pontos Altos</h5><ul id="coach-positives-list"><li>Analisando consistência...</li></ul></div>
+                <div class="coach-col negatives"><h5>⚠️ Pontos de Atenção & Ajustes</h5><ul id="coach-negatives-list"><li>Analisando gargalos...</li></ul></div>
+            </div>
+            <p style="margin-top: 14px; font-size: 12px; color: var(--accent-blue);" id="coach-next-action">
+                🚀 Análise semanal concluída. O seu novo plano de treinamento adaptativo já está calibrado na aba de <strong>Dashboard</strong>.
+            </p>
+        </div>
+
+        <div class="section-title" style="margin-bottom: 16px;">📊 Evolução do Volume Semanal</div>
+        <div class="chart-container"><canvas id="weeklyVolumeChart"></canvas></div>
+
+        <div class="section-title" style="margin-bottom: 16px;">Recordes Pessoais Estimados (PRs)</div>
+        <div class="pr-grid">
+            <div class="pr-card"><h3>50 Metros</h3><div class="value" id="pr-50m" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-50m-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>100 Metros</h3><div class="value" id="pr-100m" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-100m-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>500 Metros</h3><div class="value" id="pr-500m" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-500m-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>1 Quilômetro</h3><div class="value" id="pr-1km" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-1km-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>Melhor 5K</h3><div class="value" id="pr-5k" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-5k-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>Melhor 10K</h3><div class="value" id="pr-10k" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-10k-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>Meia Maratona (21K)</h3><div class="value" id="pr-21k" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-21k-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+            <div class="pr-card"><h3>Maratona (42K)</h3><div class="value" id="pr-42k" style="font-size: 16px; margin-top: 4px; color: var(--accent-blue);">Sem registro</div><div class="subtext" id="pr-42k-date" style="margin-top: 4px; font-size: 11px;">-</div></div>
+        </div>
+    </div>
+
+    <script>
+        let weeklyChartInstance = null;
+        let globalWorkoutsData = [];
+        let activeSelectedDate = null; // Variável para controlar o estado do Acordeão por Clique
+
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/api/workouts');
+                if (!response.ok) throw new Error('Erro ao buscar treinos do servidor');
+                const data = await response.json();
+                globalWorkoutsData = Array.isArray(data) ? data : (data.workouts || []);
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const currentDayOfWeek = today.getDay();
+                const diffToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+                const currentMonday = new Date(today);
+                currentMonday.setDate(today.getDate() + diffToMonday);
+                currentMonday.setHours(0, 0, 0, 0);
+
+                const lastMonday = new Date(currentMonday);
+                lastMonday.setDate(currentMonday.getDate() - 7);
+                const lastSunday = new Date(currentMonday);
+                lastSunday.setDate(currentMonday.getDate() - 1);
+                lastSunday.setHours(23, 59, 59, 999);
+
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(today.getDate() - 7);
+                const twentyEightDaysAgo = new Date(today);
+                twentyEightDaysAgo.setDate(today.getDate() - 28);
+
+                let acuteKm = 0;
+                let chronicKm = 0;
+                let lastWeekKm = 0;
+
+                let prs = {
+                    '50m': { time: Infinity, date: '-' }, '100m': { time: Infinity, date: '-' },
+                    '500m': { time: Infinity, date: '-' }, '1km': { time: Infinity, date: '-' },
+                    '5k': { time: Infinity, date: '-' }, '10k': { time: Infinity, date: '-' },
+                    '21k': { time: Infinity, date: '-' }, '42k': { time: Infinity, date: '-' }
+                };
+
+                globalWorkoutsData.forEach((w) => {
+                    if (!w.activityDate) return;
+                    const datePart = w.activityDate.substring(0, 10);
+                    const wDate = new Date(datePart + 'T00:00:00');
+                    const distKm = parseFloat(w.distanceKm || w.distance || w.distancia) || 0;
+                    
+                    let durationSec = 0;
+                    const durMins = parseFloat(w.durationMinutes || w.duracaoMinutos) || 0;
+                    if (durMins > 0) durationSec = durMins * 60;
+                    else durationSec = parseFloat(w.durationSeconds || w.duration || w.timeSeconds || w.tempo) || 0;
+
+                    if (distKm > 0) {
+                        if (wDate >= lastMonday && wDate <= lastSunday) lastWeekKm += distKm;
+                        if (wDate >= sevenDaysAgo && wDate <= today) acuteKm += distKm;
+                        if (wDate >= twentyEightDaysAgo && wDate <= today) chronicKm += distKm;
+
+                        if (durationSec > 0) {
+                            const dateFormatted = datePart.split('-').reverse().join('/');
+                            const checkAndUpdate = (key, targetKm) => {
+                                if (distKm >= targetKm * 0.95) {
+                                    let effectiveTime = durationSec;
+                                    if (distKm > targetKm * 1.05) effectiveTime = (durationSec / distKm) * targetKm;
+                                    if (effectiveTime < prs[key].time) prs[key] = { time: Math.round(effectiveTime), date: dateFormatted };
+                                }
+                            };
+                            if (distKm >= 0.04) checkAndUpdate('50m', 0.05);
+                            if (distKm >= 0.09) checkAndUpdate('100m', 0.1);
+                            if (distKm >= 0.45) checkAndUpdate('500m', 0.5);
+                            if (distKm >= 0.90) checkAndUpdate('1km', 1.0);
+                            if (distKm >= 4.50) checkAndUpdate('5k', 5.0);
+                            if (distKm >= 9.00) checkAndUpdate('10k', 10.0);
+                            if (distKm >= 19.00) checkAndUpdate('21k', 21.097);
+                            if (distKm >= 40.00) checkAndUpdate('42k', 42.195);
+                        }
+                    }
+                });
+
+                const acuteLoad = Math.round(acuteKm * 5);
+                const chronicLoad = Math.round((chronicKm / 4) * 5);
+                let acwrVal = chronicLoad > 0 ? (acuteLoad / chronicLoad) : (acuteLoad > 0 ? 1.15 : 1.0);
+
+                const totalRunsCount = globalWorkoutsData.filter(w => (!w.type || w.type === 'corrida')).length;
+
+                document.getElementById('val-last-week-km').innerText = `${lastWeekKm.toFixed(1)} km`;
+                document.getElementById('val-change').innerText = `Baseado em ${totalRunsCount} atividades`;
+                document.getElementById('val-acute').innerText = acuteLoad;
+                document.getElementById('val-chronic').innerText = chronicLoad > 0 ? chronicLoad : Math.round(acuteLoad * 0.9);
+                document.getElementById('val-acwr').innerText = acwrVal.toFixed(2);
+
+                const banner = document.getElementById('status-container');
+                banner.className = 'status-banner ZONA_OTIMA';
+                banner.innerHTML = `
+                    <h2>Status do Treinamento: ZONA ÓTIMA</h2>
+                    <p>Carga de treinos equilibrada e segura sincronizada com o motor de inteligência.</p>
+                `;
+
+                Object.keys(prs).forEach(k => updatePrElement(k, prs[k]));
+                renderCalendarWeek(globalWorkoutsData);
+                renderWeeklyVolumeChart(globalWorkoutsData);
+                renderCoachVerdict(globalWorkoutsData, lastWeekKm, acuteKm);
+
+            } catch (err) {
+                console.error('Erro ao carregar análises:', err);
+            }
+        }
+
+        // Lógica de Toggle por Clique no Card (Abre ou Recolhe)
+        function toggleWorkoutAudit(dateString, hasWorkout, elementCard) {
+            const drawer = document.getElementById('workout-audit-drawer');
+            
+            // Remove destaque ativo de todos os cards
+            document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-audit'));
+
+            if (activeSelectedDate === dateString) {
+                // Se já estava aberto para este dia, recolhe
+                drawer.style.display = 'none';
+                activeSelectedDate = null;
+                return;
+            }
+
+            // Ativa o novo dia e chama o motor de auditoria externa
+            activeSelectedDate = dateString;
+            elementCard.classList.add('active-audit');
+
+            const auditData = auditSpecificWorkout(dateString, globalWorkoutsData);
+
+            document.getElementById('audit-drawer-title').innerText = auditData.title;
+            document.getElementById('audit-compliance').innerHTML = auditData.compliance;
+            document.getElementById('audit-volume').innerHTML = auditData.volume;
+            document.getElementById('audit-pace').innerHTML = auditData.pace;
+            document.getElementById('audit-fix').innerHTML = auditData.fix;
+
+            drawer.style.display = 'block';
+            drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function renderCoachVerdict(workouts, lastWeekKm, acuteKm) {
+            const verdict = generateCoachVerdictEngine(workouts, lastWeekKm, acuteKm);
+            document.getElementById('coach-summary-text').innerHTML = verdict.summary;
+            document.getElementById('coach-positives-list').innerHTML = verdict.posHtml;
+            document.getElementById('coach-negatives-list').innerHTML = verdict.negHtml;
+        }
+
+        function updatePrElement(key, prData) {
+            const valElem = document.getElementById(`pr-${key}`);
+            const dateElem = document.getElementById(`pr-${key}-date`);
+            if (!valElem || !dateElem) return;
+
+            if (prData.time !== Infinity) {
+                valElem.innerText = formatDuration(prData.time);
+                dateElem.innerText = `Em ${prData.date}`;
+            } else {
+                valElem.innerText = 'Sem registro';
+                dateElem.innerText = 'Não mapeado';
+            }
+        }
+
+        function formatDuration(totalSeconds) {
+            const hrs = Math.floor(totalSeconds / 3600);
+            const mins = Math.floor((totalSeconds % 3600) / 60);
+            const secs = Math.floor(totalSeconds % 60);
+            if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+            if (mins > 0) return `${mins}m ${secs}s`;
+            return `${secs}s`;
+        }
+
+        function renderCalendarWeek(workouts) {
+            const calendarGrid = document.getElementById('calendar-grid');
+            if (!calendarGrid) return;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const currentDayOfWeek = today.getDay(); 
+            const diffToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+            const monday = new Date(today);
+            monday.setDate(today.getDate() + diffToMonday);
+            monday.setHours(0, 0, 0, 0);
+
+            const daysLabels = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+            let htmlCards = '';
+            let currentWeekTotalKm = 0;
+
+            for (let i = 0; i < 7; i++) {
+                const loopDate = new Date(monday);
+                loopDate.setDate(monday.getDate() + i);
+                
+                const year = loopDate.getFullYear();
+                const month = String(loopDate.getMonth() + 1).padStart(2, '0');
+                const day = String(loopDate.getDate()).padStart(2, '0');
+                const dateString = `${year}-${month}-${day}`;
+
+                const dayWorkouts = workouts.filter(w => w.activityDate && w.activityDate.substring(0, 10) === dateString);
+                const hasWorkout = dayWorkouts.length > 0;
+                let cardClass = '';
+                let displayInfo = 'Descanso';
+                let iconHtml = '💤';
+
+                if (hasWorkout) {
+                    const runWorkout = dayWorkouts.find(w => !w.type || w.type === 'corrida' || (w.distanceKm || w.distance) > 0);
+                    const mobilityWorkout = dayWorkouts.find(w => w.type === 'mobilidade' || (w.title && w.title.toLowerCase().includes('mobilidade')));
+                    const drillWorkout = dayWorkouts.find(w => w.type === 'educativo' || (w.title && w.title.toLowerCase().includes('educativo')));
+
+                    if (runWorkout) {
+                        const totalKm = dayWorkouts.reduce((acc, w) => acc + (parseFloat(w.distanceKm || w.distance) || 0), 0);
+                        currentWeekTotalKm += totalKm;
+                        displayInfo = `${totalKm.toFixed(1)} km`;
+                        cardClass = 'has-workout';
+                        iconHtml = '☀️';
+                    } else if (mobilityWorkout) {
+                        displayInfo = `${mobilityWorkout.durationMinutes || mobilityWorkout.duration || 30} min`;
+                        cardClass = 'has-mobility';
+                        iconHtml = '🧘‍♂️';
+                    } else if (drillWorkout) {
+                        displayInfo = `${drillWorkout.durationMinutes || drillWorkout.duration || 20} min`;
+                        cardClass = 'has-drills';
+                        iconHtml = '⚡';
+                    } else {
+                        displayInfo = 'Ativo';
+                        cardClass = 'has-workout';
+                        iconHtml = '🎯';
+                    }
+                }
+
+                const isToday = loopDate.getTime() === today.getTime();
+
+                htmlCards += `
+                    <div class="day-card ${cardClass} ${isToday ? 'today' : ''}" onclick="toggleWorkoutAudit('${dateString}', ${hasWorkout}, this)">
+                        <div>
+                            <div class="day-name">${daysLabels[i]}</div>
+                            <div class="day-date">${day}/${month}</div>
+                        </div>
+                        <div class="day-icon">${iconHtml}</div>
+                        <div class="day-km">${displayInfo}</div>
+                    </div>
+                `;
+            }
+
+            calendarGrid.innerHTML = calendarGrid ? '' : ''; // Reset safety
+            document.getElementById('calendar-grid').innerHTML = htmlCards;
+            document.getElementById('current-week-total').innerText = `Acumulado: ${currentWeekTotalKm.toFixed(1)} km`;
+        }
+
+        function renderWeeklyVolumeChart(workouts) {
+            const weeksMap = {};
+            workouts.forEach(w => {
+                const dist = parseFloat(w.distanceKm || w.distance) || 0;
+                if (!w.activityDate || dist === 0) return;
+                
+                const d = new Date(w.activityDate.substring(0, 10) + 'T00:00:00');
+                const dayOfWeek = d.getDay();
+                const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                const mondayOfWeek = new Date(d);
+                mondayOfWeek.setDate(diff);
+
+                const weekKey = `${String(mondayOfWeek.getDate()).padStart(2, '0')}/${String(mondayOfWeek.getMonth() + 1).padStart(2, '0')}`;
+                if (!weeksMap[weekKey]) weeksMap[weekKey] = { totalKm: 0, sortDate: new Date(mondayOfWeek) };
+                weeksMap[weekKey].totalKm += dist;
+            });
+
+            const sortedWeeks = Object.keys(weeksMap).map(k => ({ key: k, ...weeksMap[k] })).sort((a, b) => a.sortDate - b.sortDate).slice(-6);
+            const labels = sortedWeeks.map(w => `Semana ${w.key}`);
+            const values = sortedWeeks.map(w => parseFloat(w.totalKm.toFixed(2)));
+
+            const ctx = document.getElementById('weeklyVolumeChart').getContext('2d');
+            if (weeklyChartInstance) weeklyChartInstance.destroy();
+
+            weeklyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Volume Semanal (km)', data: values, backgroundColor: '#38bdf8', borderRadius: 6, barThickness: 'flex', maxBarThickness: 40 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: { anchor: 'end', align: 'top', color: '#f8fafc', font: { size: 11, weight: 'bold' }, formatter: (v) => v > 0 ? `${v} km` : '' },
+                        tooltip: { callbacks: { label: (ctx) => ` Volume: ${ctx.parsed.y} km` } }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+                        y: { display: false, grid: { display: false }, beginAtZero: true, suggestedMax: Math.max(...values, 10) * 1.2 }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        loadAnalytics();
+    </script>
+</body>
+</html>

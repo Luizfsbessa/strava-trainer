@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workout {
+  id              String   @id @default(uuid())
+  title           String
+  type            String?  // Adicione esta linha
+  distanceKm      Float
+  durationMinutes Float
+  pace            String
+  elevationMeters Int
+  activityDate    DateTime
+  createdAt       DateTime @default(now())
+}
+
+model UserProfile {
+  id                 String   @id @default("main-user")
+  age                Int
+  gender             String
+  weightKg           Float
+  heightCm           Float
+  activityLevel      String
+  goal               String
+  dailyCalorieTarget Int
+  updatedAt          DateTime @updatedAt
+}
+
+model TrainingPlan {
+  id              String   @id @default(uuid())
+  userId          String   @default("main-user")
+  dayOfWeek       Int      // 0 a 6 (Domingo a Sábado)
+  dayName         String   // "Segunda-feira", etc.
+  activityType    String   // "RUNNING", "MOBILITY", "STRENGTH", "DRILLS", "REST"
+  title           String   // Ex: "Mobilidade de Quadril e Core"
+  description     String?  // Detalhes do que fazer
+  distanceKm      Float?   // Caso seja corrida
+  durationMinutes Int?     // Duração estimada
+  videoSearchTerm String?  // Termo para buscar no YouTube (ex: "mobilidade de quadril para corredores")
+  videoUrl        String?  // URL direta do YouTube se quisermos fixar
+  completed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Profile {
+  id               Int      @id @default(autoincrement())
+  currentWeight    Float    @default(103)
+  targetWeight     Float    @default(85)
+  heightCm         Int      @default(180)
+  birthDate        String   @default("1987-03-12")
+  goal             String   @default("WEIGHT_LOSS")
+  updatedAt        DateTime @updatedAt
+}
