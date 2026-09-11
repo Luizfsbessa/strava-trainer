@@ -24,8 +24,8 @@ router.get('/auth/strava/callback', async (req: Request, res: Response) => {
     const runs = await StravaService.getAthleteRuns(accessToken);
 
     // Gera o plano de treino customizado
-    const plan = TrainingPlanService.generateWeeklyPlan(runs);
-
+    const plan = TrainingPlanService.generateNextWeekPlan(runs);
+    
     res.json({
       status: "Autenticado com sucesso!",
       atleta: {
