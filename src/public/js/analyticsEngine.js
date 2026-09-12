@@ -1,35 +1,54 @@
 /**
- * Motor de Inteligência e Auditoria Clínica - Strava Trainer (Ajustado)
- * Validação inteligente para treinos de tempo (educativos/mobilidade) vs distância (corrida)
+ * Motor de Inteligência e Auditoria Clínica - Strava Trainer (Dinâmico & Adaptativo)
+ * Lê dinamicamente o plano gerado pelo TrainingPlanService / Banco de Dados
  */
 
-const PERIODIZATION_PLAN = {
-    1: { type: 'mobilidade', title: 'Mobilidade', targetKm: 0, targetMin: 30, zone: 'Z1 - Regenerativo', pace: '-' },
-    2: { type: 'corrida', title: 'Corrida Leve (Z2)', targetKm: 5.0, targetMin: 30, zone: 'Z2 - Queima de Gordura', pace: '7:42 - 8:26 /km' },
-    3: { type: 'educativo', title: 'Educativos', targetKm: 0, targetMin: 25, zone: 'Z1 - Técnica', pace: '-' },
-    4: { type: 'corrida', title: 'Rodagem / Intervalado', targetKm: 6.0, targetMin: 35, zone: 'Z3 - Moderado', pace: '6:58 - 7:37 /km' },
-    5: { type: 'mobilidade', title: 'Descanso / Mobilidade', targetKm: 0, targetMin: 20, zone: 'Z0 - Descanso', pace: '-' },
-    6: { type: 'corrida', title: 'Longo de Base', targetKm: 9.0, targetMin: 60, zone: 'Z2 - Aeróbico Extendido', pace: '7:42 - 8:26 /km' },
-    0: { type: 'descanso', title: 'Descanso', targetKm: 0, targetMin: 0, zone: 'Z0 - Descanso', pace: '-' }
-};
-
-function getPlannedWorkoutForDay(dateObj) {
-    const jsDay = dateObj.getDay(); 
-    return PERIODIZATION_PLAN[jsDay];
+/**
+ * Mapeia o dia do JS (0-6) para o nome do dia da semana usado no plano gerado
+ */
+function getDayName(dateObj) {
+    const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    return days[dateObj.getDay()];
 }
 
-function auditSpecificWorkout(dateString, workouts) {
+/**
+ * Busca o treino planejado dinamicamente com base na lista de sessões do plano da semana
+ */
+function getPlannedWorkoutForDay(dateObj, plannedSessions = []) {
+    const targetDayName = getDayName(dateObj);
+    
+    // Procura na lista de sessões vindas do backend/serviço de treino
+    const foundSession = plannedSessions.find(s => s.dayOfWeek === targetDayName);
+    
+    if (foundSession) {
+        return {
+            type: foundSession.sessionType.toLowerCase().includes('corrida') || foundSession.sessionType.toLowerCase().includes('longão') ? 'corrida' : 'mobilidade',
+            title: foundSession.sessionType,
+            targetKm: foundSession.targetDistanceKm || 0,
+            targetMin: 30, // Padrão estimado ou extraído
+            zone: foundSession.targetPaceZone || 'Z1/Z2',
+            pace: foundSession.targetPaceZone || '-'
+        };
+    }
+
+    // Fallback caso não encontre a sessão específica
+    const jsDay = dateObj.getDay();
+    if (jsDay === 0) return { type: 'descanso', title: 'Descanso Total', targetKm: 0, targetMin: 0, zone: 'Z0', pace: '-' };
+    return { type: 'mobilidade', title: 'Mobilidade / Atividade', targetKm: 0, targetMin: 20, zone: 'Z1', pace: '-' };
+}
+
+function auditSpecificWorkout(dateString, workouts, plannedSessions = []) {
     const d = new Date(dateString + 'T00:00:00');
-    const planned = getPlannedWorkoutForDay(d);
+    const planned = getPlannedWorkoutForDay(d, plannedSessions);
     
     const dayWorkouts = workouts.filter(w => w.activityDate && w.activityDate.substring(0, 10) === dateString);
     const hasWorkout = dayWorkouts.length > 0;
 
     if (!hasWorkout) {
         return {
-            title: `Auditoria do Dia (${dateString.split('-').reverse().join('/')}) — Descanso Programado`,
-            compliance: `💤 <strong>Repouso Estruturado:</strong> Nenhum estresse executado. Período essencial para supercompensação (${planned.title}).`,
-            volume: `📊 <strong>Carga Realizada:</strong> 0.0 km / 0 min. Alinhado com o repouso.`,
+            title: `Auditoria do Dia (${dateString.split('-').reverse().join('/')}) — ${planned.title} (Repouso)`,
+            compliance: `💤 <strong>Repouso Estruturado:</strong> Nenhum estresse executado. Período planejado para: ${planned.title}.`,
+            volume: `📊 <strong>Carga Realizada:</strong> 0.0 km / 0 min. Alinhado com o descanso.`,
             pace: `⚡ <strong>Esforço Cardíaco:</strong> Frequência cardíaca basal de repouso mantida.`,
             fix: `💡 <strong>Smart Fix:</strong> Mantenha a hidratação e o foco na recuperação.`
         };
@@ -45,7 +64,7 @@ function auditSpecificWorkout(dateString, workouts) {
     
     const actualMins = Math.round(durationSec / 60);
 
-    const isPlannedRun = planned.type === 'corrida';
+    const isPlannedRun = planned.type === 'corrida' || planned.targetKm > 0;
     const isExecutedRun = dist > 0;
 
     let complianceText = `✅ <strong>Aderência Perfeita:</strong> Atividade executada de acordo com o planejado (${planned.title}).`;
@@ -53,23 +72,29 @@ function auditSpecificWorkout(dateString, workouts) {
     let paceAnalysis = `⏱️ <strong>Ritmo Alvo (${planned.pace}):</strong> Controlado dentro da zona esperada.`;
     let fixText = `💡 <strong>Smart Fix:</strong> Carga processada e integrada ao ciclo semanal.`;
 
-    // Caso o atleta tenha feito educativo/mobilidade num dia de corrida (ou vice-versa)
     if (isPlannedRun && !isExecutedRun) {
-        complianceText = `🌟 <strong>Esforço Validado:</strong> Excelente iniciativa ao manter o corpo ativo com <strong>${actualMins} min</strong> de educativos/técnica, mesmo com o plano original prevendo ${planned.title} (${planned.zone}).`;
-        volumeText = `📊 <strong>Carga por Tempo:</strong> Você realizou <strong>${actualMins} min</strong> de estímulo técnico (Sessão sem registro de quilometragem por distâncias).`;
-        paceAnalysis = `🧘‍♂️ <strong>Controle de Amplitude:</strong> Sessão voltada para mobilidade e mecânica de passada (${actualMins} min). Ritmo de corrida não aplicável.`;
-        fixText = `🔧 <strong>Smart Fix:</strong> O treino Z3 de alta intensidade foi substituído por precaução ou tempo. <strong>Sugestão:</strong> Aproveite o descanso de amanhã para encaixar os tiros Z3 ou realoque para o próximo bloco de rodagem.`;
-    } else if (isPlannedRun && isExecutedRun) {
-        if (dist < planned.targetKm * 0.8) {
-            complianceText = `⚠️ <strong>Déficit Parcial de Volume:</strong> Parabéns por ir pra rua! Porém, foram entregues ${dist.toFixed(1)} km dos ${planned.targetKm} km planejados.`;
-        } else if (dist > planned.targetKm * 1.2) {
-            complianceText = `🚀 <strong>Superávit de Carga:</strong> Excelente entrega! Volume acima do programado (${dist.toFixed(1)} km vs ${planned.targetKm} km esperados).`;
+        complianceText = `🌟 <strong>Esforço Validado:</strong> Excelente iniciativa ao manter o corpo ativo com <strong>${actualMins} min</strong> de estímulo, mesmo com o plano original prevendo ${planned.title}.`;
+        volumeText = `📊 <strong>Carga por Tempo:</strong> Você realizou <strong>${actualMins} min</strong> de sessão técnica/alternativa.`;
+        paceAnalysis = `🧘‍♂️ <strong>Controle de Carga:</strong> Sessão voltada para adaptação mecânica (${actualMins} min).`;
+        fixText = `🔧 <strong>Smart Fix:</strong> O treino planejado foi adaptado. <strong>Sugestão:</strong> Monitore a fadiga para realocar o volume se necessário.`;
+    } else if (isExecutedRun) {
+        if (planned.targetKm > 0) {
+            if (dist < planned.targetKm * 0.8) {
+                complianceText = `⚠️ <strong>Déficit Parcial de Volume:</strong> Entregues ${dist.toFixed(1)} km dos ${planned.targetKm} km planejados para ${planned.title}.`;
+            } else if (dist > planned.targetKm * 1.2) {
+                complianceText = `🚀 <strong>Superávit de Carga:</strong> Excelente entrega! Volume acima do programado (${dist.toFixed(1)} km vs ${planned.targetKm} km esperados).`;
+            }
+        } else {
+            complianceText = `🔥 <strong>Sessão Livre Integrada:</strong> Você executou ${dist.toFixed(1)} km em um dia originalmente programado para (${planned.title}). Carga computada com sucesso!`;
         }
-        const calculatedPaceSec = durationSec / dist;
-        const paceMin = Math.floor(calculatedPaceSec / 60);
-        const paceSec = Math.round(calculatedPaceSec % 60);
-        const paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
-        paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> A meta da planilha era ${planned.pace}.`;
+        
+        if (dist > 0) {
+            const calculatedPaceSec = durationSec / dist;
+            const paceMin = Math.floor(calculatedPaceSec / 60);
+            const paceSec = Math.round(calculatedPaceSec % 60);
+            const paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
+            paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> Meta da planilha: ${planned.pace}.`;
+        }
     }
 
     return {
@@ -84,7 +109,7 @@ function auditSpecificWorkout(dateString, workouts) {
 function generateCoachVerdictEngine(workouts, lastWeekKm, acuteKm) {
     let summary = `Atleta, o ciclo semanal demonstra flexibilidade inteligente. O importante é manter a constância do movimento e ajustar os blocos de intensidade quando necessário.`;
     let posHtml = `<li>Parabéns por manter o hábito de treino ativo nos dias de ajuste.</li>`;
-    let negHtml = `<li>Fique atento para realocar os treinos de alta intensidade (Z3) perdidos para não perder o pico de forma.</li>`;
+    let negHtml = `<li>Fique atento para realocar os treinos de alta intensidade perdidos para não perder o pico de forma.</li>`;
 
     if (lastWeekKm > 0) {
         posHtml += `<li>Base aeróbica sólida consolidada na semana anterior (${lastWeekKm.toFixed(1)} km).</li>`;
