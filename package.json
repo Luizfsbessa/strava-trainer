@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "build": "npx prisma migrate deploy && tsc",
+    "build": "node node_modules/prisma/build/index.js migrate deploy && tsc",
     "start": "node src/index.js"
   },
   "dependencies": {
