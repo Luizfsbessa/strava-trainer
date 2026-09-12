@@ -56,6 +56,28 @@ export class ProgressionService {
     };
   }
 
+  // Motor de auditoria ajustado para tratar trocas de dias como "Divergência no Treino" sem o rótulo confuso de inversão
+  public static auditWorkoutExecution(plannedType: string, executedVolume: number, plannedVolume?: number) {
+    if (plannedType === 'Descanso Total' && executedVolume > 0) {
+      return {
+        complianceLabel: 'Divergência no Treino',
+        message: 'Realocação detectada: Atividade executada em dia planejado para descanso. Sistema sincronizado com o Smart Fix.'
+      };
+    }
+
+    if (plannedVolume && executedVolume > plannedVolume * 1.1) {
+      return {
+        complianceLabel: 'Divergência no Treino',
+        message: `Superávit de Carga: Volume acima do programado (${executedVolume} km vs ${plannedVolume} km esperados).`
+      };
+    }
+
+    return {
+      complianceLabel: 'Aderência Perfeita',
+      message: 'Atividade executada de acordo com o planejado.'
+    };
+  }
+
   public static calculateProgression(workouts: WorkoutInput[]): WeeklyProgressionReport {
     if (!workouts || workouts.length === 0) {
       return {

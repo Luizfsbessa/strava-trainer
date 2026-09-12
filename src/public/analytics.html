@@ -54,6 +54,8 @@
         .day-card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px; cursor: pointer; transition: all 0.2s ease; }
         .day-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
         .day-card.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
+        .day-card.has-mobility { border-color: var(--accent-purple); background: linear-gradient(135deg, #131b2e 0%, #2e1065 100%); }
+        .day-card.has-drills { border-color: var(--accent-yellow); background: linear-gradient(135deg, #131b2e 0%, #451a03 100%); }
         .day-card.active-audit { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
         .day-card.today { box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
         .day-name { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
@@ -123,7 +125,7 @@
         </div>
 
         <div class="section-header">
-            <div class="section-title">📅 Rastreio da Semana Atual (Seg - Dom)</div>
+            <div class="section-title">📅 Rastreio da Semana Atual</div>
             <div class="current-week-badge" id="current-week-total">Acumulado: 0.0 km</div>
         </div>
         <div class="calendar-week-grid" id="calendar-grid"></div>
@@ -391,7 +393,7 @@
                         cardClass = 'has-drills';
                         iconHtml = '⚡';
                     } else {
-                        displayInfo = 'Ativo';
+                        displayInfo = 'Realizado';
                         cardClass = 'has-workout';
                         iconHtml = '🎯';
                     }
@@ -411,8 +413,7 @@
                 `;
             }
 
-            calendarGrid.innerHTML = calendarGrid ? '' : ''; // Reset safety
-            document.getElementById('calendar-grid').innerHTML = htmlCards;
+            calendarGrid.innerHTML = htmlCards;
             document.getElementById('current-week-total').innerText = `Acumulado: ${currentWeekTotalKm.toFixed(1)} km`;
         }
 

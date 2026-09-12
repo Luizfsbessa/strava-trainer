@@ -7,17 +7,19 @@
     "start": "node src/index.js"
   },
   "dependencies": {
-  "@prisma/client": "5.22.0",
-  "prisma": "5.22.0",
-  "axios": "^1.20.0",
-  "cors": "^2.8.6",
-  "dotenv": "^16.6.1",
-  "express": "^4.22.2",
-  "fast-xml-parser": "^4.5.7",
-  "gpxparser": "^3.0.8",
-  "multer": "^1.4.5-lts.2"
+    "@prisma/client": "5.22.0",
+    "axios": "^1.20.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "fast-xml-parser": "^4.5.7",
+    "gpxparser": "^3.0.8",
+    "multer": "^1.4.5-lts.2",
+    "prisma": "5.22.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.25",
     "@types/multer": "^1.4.13",
