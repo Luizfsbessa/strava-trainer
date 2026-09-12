@@ -50,25 +50,48 @@
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .section-title { font-size: 18px; font-weight: 700; color: var(--text-main); margin: 0; }
         .current-week-badge { background-color: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+        
+        /* Grid Semanal Inteligente: Cards opacos por padrão e cor viva no hover/clique */
         .calendar-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 16px; }
-        .day-card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px; cursor: pointer; transition: all 0.2s ease; }
-        .day-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
-        .day-card.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
-        .day-card.has-mobility { border-color: var(--accent-purple); background: linear-gradient(135deg, #131b2e 0%, #2e1065 100%); }
-        .day-card.has-drills { border-color: var(--accent-yellow); background: linear-gradient(135deg, #131b2e 0%, #451a03 100%); }
-        .day-card.active-audit { border-color: var(--accent-green); box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
-        .day-card.today { box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+        .day-card { 
+            background-color: rgba(19, 27, 46, 0.5); /* Opaco por padrão */
+            border: 1px solid rgba(30, 41, 59, 0.6); 
+            border-radius: 10px; 
+            padding: 14px 10px; 
+            text-align: center; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            min-height: 120px; 
+            cursor: pointer; 
+            transition: all 0.25s ease; 
+            opacity: 0.65;
+        }
+        .day-card:hover, .day-card.active-audit { 
+            background-color: var(--bg-card); /* Cor viva */
+            border-color: var(--accent-blue); 
+            opacity: 1;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+        }
+        .day-card.today { 
+            opacity: 0.95;
+            border-color: rgba(56, 189, 248, 0.6);
+        }
+        .day-card.completed {
+            opacity: 0.9;
+        }
         .day-name { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
-        .day-date { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-        .day-icon { font-size: 18px; margin: 4px 0; }
-        .day-km { font-size: 14px; font-weight: 800; color: var(--accent-blue); }
+        .day-date { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .day-icon { font-size: 18px; margin: 2px 0; }
+        .day-km { font-size: 13px; font-weight: 800; color: var(--accent-blue); }
+        .check-badge { font-size: 11px; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border-radius: 4px; padding: 2px 4px; margin-top: 4px; font-weight: 700; display: inline-block; }
 
         /* Acordeão de Auditoria por Clique */
         .workout-audit-drawer { background: var(--bg-card); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); display: none; animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
         .audit-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
         .audit-title { font-size: 16px; font-weight: 700; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
-        .audit-hint { font-size: 12px; color: var(--text-muted); }
         .audit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
         .audit-item { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
         .audit-item h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
@@ -175,14 +198,26 @@
     <script>
         let weeklyChartInstance = null;
         let globalWorkoutsData = [];
-        let activeSelectedDate = null; // Variável para controlar o estado do Acordeão por Clique
+        let globalPlanSessions = [];
+        let activeSelectedDate = null;
 
         async function loadAnalytics() {
             try {
-                const response = await fetch('/api/workouts');
-                if (!response.ok) throw new Error('Erro ao buscar treinos do servidor');
-                const data = await response.json();
-                globalWorkoutsData = Array.isArray(data) ? data : (data.workouts || []);
+                // Busca em paralelo os treinos executados e o plano de treino atual
+                const [workoutsRes, planRes] = await Promise.all([
+                    fetch('/api/workouts'),
+                    fetch('/api/plan')
+                ]);
+
+                if (!workoutsRes.ok) throw new Error('Erro ao buscar treinos do servidor');
+                const workoutsData = await workoutsRes.json();
+                globalWorkoutsData = Array.isArray(workoutsData) ? workoutsData : (workoutsData.workouts || []);
+
+                if (planRes.ok) {
+                    const planData = await planRes.json();
+                    globalPlanSessions = planData.sessions || planData.plan || (Array.isArray(planData) ? planData : []);
+                    window.lastFetchedPlanSessions = globalPlanSessions;
+                }
 
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -272,7 +307,7 @@
                 `;
 
                 Object.keys(prs).forEach(k => updatePrElement(k, prs[k]));
-                renderCalendarWeek(globalWorkoutsData);
+                renderCalendarWeek(globalWorkoutsData, globalPlanSessions);
                 renderWeeklyVolumeChart(globalWorkoutsData);
                 renderCoachVerdict(globalWorkoutsData, lastWeekKm, acuteKm);
 
@@ -285,21 +320,17 @@
         function toggleWorkoutAudit(dateString, hasWorkout, elementCard) {
             const drawer = document.getElementById('workout-audit-drawer');
             
-            // Remove destaque ativo de todos os cards
             document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-audit'));
 
             if (activeSelectedDate === dateString) {
-                // Se já estava aberto para este dia, recolhe
                 drawer.style.display = 'none';
                 activeSelectedDate = null;
                 return;
             }
 
-            // Ativa o novo dia e chama o motor de auditoria externa
             activeSelectedDate = dateString;
             elementCard.classList.add('active-audit');
 
-            // Garante que enviamos a lista de sessões do plano para o motor dinâmico cruzar os dados corretamente
             const currentPlanSessions = window.lastFetchedPlanSessions || [];
             const auditData = auditSpecificWorkout(dateString, globalWorkoutsData, currentPlanSessions);
 
@@ -343,7 +374,7 @@
             return `${secs}s`;
         }
 
-        function renderCalendarWeek(workouts) {
+        function renderCalendarWeek(workouts, planSessions) {
             const calendarGrid = document.getElementById('calendar-grid');
             if (!calendarGrid) return;
             
@@ -357,6 +388,7 @@
             monday.setHours(0, 0, 0, 0);
 
             const daysLabels = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+            const dayNamesMap = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
             let htmlCards = '';
             let currentWeekTotalKm = 0;
 
@@ -371,11 +403,22 @@
 
                 const dayWorkouts = workouts.filter(w => w.activityDate && w.activityDate.substring(0, 10) === dateString);
                 const hasWorkout = dayWorkouts.length > 0;
+                
+                // Procura a sessão correspondente no plano semanal da API
+                const dayLabelName = daysLabels[i];
+                const matchedPlanSession = planSessions.find(s => {
+                    if (!s.day) return false;
+                    const sDay = s.day.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                    return sDay.includes(dayLabelName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+                });
+
                 let cardClass = '';
                 let displayInfo = 'Descanso';
                 let iconHtml = '💤';
+                let checkBadgeHtml = '';
 
                 if (hasWorkout) {
+                    // Há treino executado: exibe dados reais e o check de aderência ✅
                     const runWorkout = dayWorkouts.find(w => !w.type || w.type === 'corrida' || (w.distanceKm || w.distance) > 0);
                     const mobilityWorkout = dayWorkouts.find(w => w.type === 'mobilidade' || (w.title && w.title.toLowerCase().includes('mobilidade')));
                     const drillWorkout = dayWorkouts.find(w => w.type === 'educativo' || (w.title && w.title.toLowerCase().includes('educativo')));
@@ -384,20 +427,38 @@
                         const totalKm = dayWorkouts.reduce((acc, w) => acc + (parseFloat(w.distanceKm || w.distance) || 0), 0);
                         currentWeekTotalKm += totalKm;
                         displayInfo = `${totalKm.toFixed(1)} km`;
-                        cardClass = 'has-workout';
+                        cardClass = 'has-workout completed';
                         iconHtml = '☀️';
                     } else if (mobilityWorkout) {
                         displayInfo = `${mobilityWorkout.durationMinutes || mobilityWorkout.duration || 30} min`;
-                        cardClass = 'has-mobility';
+                        cardClass = 'has-mobility completed';
                         iconHtml = '🧘‍♂️';
                     } else if (drillWorkout) {
                         displayInfo = `${drillWorkout.durationMinutes || drillWorkout.duration || 20} min`;
-                        cardClass = 'has-drills';
+                        cardClass = 'has-drills completed';
                         iconHtml = '⚡';
                     } else {
                         displayInfo = 'Realizado';
-                        cardClass = 'has-workout';
+                        cardClass = 'has-workout completed';
                         iconHtml = '🎯';
+                    }
+                    checkBadgeHtml = `<div class="check-badge">✅ Concluído</div>`;
+                } else if (matchedPlanSession) {
+                    // Não há log, mas o plano propõe algo para este dia (ex: Sábado = Longão)
+                    displayInfo = matchedPlanSession.title || matchedPlanSession.type || 'Proposto';
+                    const titleLower = (matchedPlanSession.title || '').toLowerCase();
+                    if (titleLower.includes('longao') || titleLower.includes('corrida') || titleLower.includes('z2')) {
+                        cardClass = 'has-workout';
+                        iconHtml = '🏃';
+                    } else if (titleLower.includes('mobilidade')) {
+                        cardClass = 'has-mobility';
+                        iconHtml = '🧘‍♂️';
+                    } else if (titleLower.includes('educativo')) {
+                        cardClass = 'has-drills';
+                        iconHtml = '⚡';
+                    } else {
+                        cardClass = '';
+                        iconHtml = '📋';
                     }
                 }
 
@@ -410,7 +471,10 @@
                             <div class="day-date">${day}/${month}</div>
                         </div>
                         <div class="day-icon">${iconHtml}</div>
-                        <div class="day-km">${displayInfo}</div>
+                        <div>
+                            <div class="day-km">${displayInfo}</div>
+                            ${checkBadgeHtml}
+                        </div>
                     </div>
                 `;
             }
