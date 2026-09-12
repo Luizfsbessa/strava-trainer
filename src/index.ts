@@ -14,8 +14,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Servir a pasta public estaticamente
-app.use(express.static(path.join(__dirname, '../src/public')));
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
 
 // Rotas da API
 app.use('/api/trainings', trainingRoutes);
