@@ -57,3 +57,8 @@ model Profile {
   goal             String   @default("WEIGHT_LOSS")
   updatedAt        DateTime @updatedAt
 }
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
