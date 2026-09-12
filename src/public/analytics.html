@@ -299,7 +299,9 @@
             activeSelectedDate = dateString;
             elementCard.classList.add('active-audit');
 
-            const auditData = auditSpecificWorkout(dateString, globalWorkoutsData);
+            // Garante que enviamos a lista de sessões do plano para o motor dinâmico cruzar os dados corretamente
+            const currentPlanSessions = window.lastFetchedPlanSessions || [];
+            const auditData = auditSpecificWorkout(dateString, globalWorkoutsData, currentPlanSessions);
 
             document.getElementById('audit-drawer-title').innerText = auditData.title;
             document.getElementById('audit-compliance').innerHTML = auditData.compliance;

@@ -64,37 +64,50 @@ function auditSpecificWorkout(dateString, workouts, plannedSessions = []) {
     
     const actualMins = Math.round(durationSec / 60);
 
-    const isPlannedRun = planned.type === 'corrida' || planned.targetKm > 0;
     const isExecutedRun = dist > 0;
 
+    // Cálculo do Pace Executado
+    let paceFormatted = '-';
+    let calculatedPaceSec = 0;
+    if (isExecutedRun && durationSec > 0) {
+        calculatedPaceSec = durationSec / dist;
+        const paceMin = Math.floor(calculatedPaceSec / 60);
+        const paceSec = Math.round(calculatedPaceSec % 60);
+        paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
+    }
+
     let complianceText = `✅ <strong>Aderência Perfeita:</strong> Atividade executada de acordo com o planejado (${planned.title}).`;
-    let volumeText = `📊 <strong>Volume Realizado:</strong> ${dist > 0 ? dist.toFixed(1) + ' km' : actualMins + ' min'} executados com sucesso.`;
-    let paceAnalysis = `⏱️ <strong>Ritmo Alvo (${planned.pace}):</strong> Controlado dentro da zona esperada.`;
+    let volumeText = `📊 <strong>Volume Realizado:</strong> ${isExecutedRun ? dist.toFixed(1) + ' km' : actualMins + ' min'} executados com sucesso.`;
+    let paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> Meta da planilha: ${planned.pace}.`;
     let fixText = `💡 <strong>Smart Fix:</strong> Carga processada e integrada ao ciclo semanal.`;
 
-    if (isPlannedRun && !isExecutedRun) {
-        complianceText = `🌟 <strong>Esforço Validado:</strong> Excelente iniciativa ao manter o corpo ativo com <strong>${actualMins} min</strong> de estímulo, mesmo com o plano original prevendo ${planned.title}.`;
-        volumeText = `📊 <strong>Carga por Tempo:</strong> Você realizou <strong>${actualMins} min</strong> de sessão técnica/alternativa.`;
-        paceAnalysis = `🧘‍♂️ <strong>Controle de Carga:</strong> Sessão voltada para adaptação mecânica (${actualMins} min).`;
-        fixText = `🔧 <strong>Smart Fix:</strong> O treino planejado foi adaptado. <strong>Sugestão:</strong> Monitore a fadiga para realocar o volume se necessário.`;
-    } else if (isExecutedRun) {
+    // Auditoria rigorosa de Volume e Ritmo comparada ao planejado
+    if (isExecutedRun) {
         if (planned.targetKm > 0) {
+            const diffPct = ((dist - planned.targetKm) / planned.targetKm) * 100;
             if (dist < planned.targetKm * 0.8) {
-                complianceText = `⚠️ <strong>Déficit Parcial de Volume:</strong> Entregues ${dist.toFixed(1)} km dos ${planned.targetKm} km planejados para ${planned.title}.`;
+                complianceText = `⚠️ <strong>Déficit de Volume:</strong> Entregues ${dist.toFixed(1)} km dos ${planned.targetKm} km planejados para ${planned.title} (${Math.abs(diffPct).toFixed(0)}% abaixo).`;
             } else if (dist > planned.targetKm * 1.2) {
-                complianceText = `🚀 <strong>Superávit de Carga:</strong> Excelente entrega! Volume acima do programado (${dist.toFixed(1)} km vs ${planned.targetKm} km esperados).`;
+                complianceText = `🚀 <strong>Superávit de Carga:</strong> Volume acima do programado (${dist.toFixed(1)} km vs ${planned.targetKm} km esperados).`;
+            } else {
+                complianceText = `🎯 <strong>Volume Alvo Atingido:</strong> Excelente entrega de ${dist.toFixed(1)} km alinhados à meta de ${planned.targetKm} km.`;
             }
         } else {
-            complianceText = `🔥 <strong>Sessão Livre Integrada:</strong> Você executou ${dist.toFixed(1)} km em um dia originalmente programado para (${planned.title}). Carga computada com sucesso!`;
+            complianceText = `🔥 <strong>Sessão Realizada (${planned.title}):</strong> Executados ${dist.toFixed(1)} km em dia de estímulo alternativo/livre.`;
         }
+
+        volumeText = `📊 <strong>Volume Realizado:</strong> ${dist.toFixed(1)} km (Esperado: ${planned.targetKm > 0 ? planned.targetKm + ' km' : 'Livre/Técnico'}).`;
         
-        if (dist > 0) {
-            const calculatedPaceSec = durationSec / dist;
-            const paceMin = Math.floor(calculatedPaceSec / 60);
-            const paceSec = Math.round(calculatedPaceSec % 60);
-            const paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
-            paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> Meta da planilha: ${planned.pace}.`;
+        // Crítica severa de ritmo se houver parâmetro na planilha
+        if (planned.pace && planned.pace !== '-') {
+            paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> A meta rigorosa da planilha era <strong>${planned.pace}</strong>. Avalie se o esforço ficou dentro da zona (${planned.zone}).`;
+        } else {
+            paceAnalysis = `⏱️ <strong>Ritmo Executado (${paceFormatted}):</strong> Sessão concluída sem balizador restrito de pace na planilha.`;
         }
+    } else {
+        complianceText = `🌟 <strong>Sessão Alternativa:</strong> Realizados ${actualMins} min de estímulo sem registro de distância (Planejado: ${planned.title}).`;
+        volumeText = `📊 <strong>Carga por Tempo:</strong> ${actualMins} min dedicados.`;
+        paceAnalysis = `🧘‍♂️ <strong>Controle Mecânico:</strong> Foco em mobilidade/técnica. Ritmo de corrida não aplicável.`;
     }
 
     return {
