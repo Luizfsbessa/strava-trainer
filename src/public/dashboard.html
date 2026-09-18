@@ -307,7 +307,7 @@
           
           let detailsHtml = '';
           if (s.isRun) {
-            const suggestedPace = s.targetPaceZone || s.pace || getPaceRangeForZone(basePaceSecs, s.zone);
+            const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             detailsHtml = `
               <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
@@ -363,13 +363,17 @@
     }
 
     function getPaceRangeForZone(baseSecs, zone) {
+      if (zone && (zone.includes('Z2') || zone.includes('QUEIMA DE GORDURA'))) {
+        return '7:00 - 7:35 /km';
+      }
+      if (zone && (zone.includes('Z4') || zone.includes('Z3') || zone.includes('MODERADO'))) {
+        return '5:45 - 6:30 /km';
+      }
+
       let minMultiplier = 1.0;
       let maxMultiplier = 1.0;
 
       if (zone === 'Z1') { minMultiplier = 1.15; maxMultiplier = 1.30; }
-      else if (zone === 'Z2') { minMultiplier = 1.05; maxMultiplier = 1.15; }
-      else if (zone === 'Z3') { minMultiplier = 0.95; maxMultiplier = 1.04; }
-      else if (zone === 'Z4') { minMultiplier = 0.85; maxMultiplier = 0.94; }
       else if (zone === 'Z5') { minMultiplier = 0.75; maxMultiplier = 0.84; }
       else { return 'Livre'; }
 
