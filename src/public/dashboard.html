@@ -307,7 +307,7 @@
           
           let detailsHtml = '';
           if (s.isRun) {
-            const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
+            const suggestedPace = s.targetPaceZone || s.pace || getPaceRangeForZone(basePaceSecs, s.zone);
             detailsHtml = `
               <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
