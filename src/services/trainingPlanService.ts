@@ -6,7 +6,7 @@ export interface PlannedSession {
   targetDistanceKm?: number;
   targetPaceZone?: string;
   description: string;
-  videoSearchTerm: string; // Termo pronto para buscar no YouTube
+  videoSearchTerm: string;
 }
 
 export interface NextWeekPlan {
@@ -16,13 +16,32 @@ export interface NextWeekPlan {
   sessions: PlannedSession[];
 }
 
+export interface UserPaceSettings {
+  targetPaceZ2Min?: string;
+  targetPaceZ2Max?: string;
+  targetPaceZ4Min?: string;
+  targetPaceZ4Max?: string;
+}
+
 export class TrainingPlanService {
-  public static generateNextWeekPlan(report: WeeklyProgressionReport): NextWeekPlan {
+  public static generateNextWeekPlan(
+    report: WeeklyProgressionReport,
+    userPaceSettings?: UserPaceSettings
+  ): NextWeekPlan {
     let targetVolume = report.currentWeekKm;
     let strategy: NextWeekPlan['strategy'] = 'MANUTENCAO';
     let rationale = '';
 
-    // 1. Definição da Estratégia com base no ACWR e Variação de Volume
+    // Define os limites dinâmicos com fallback para os valores ajustados ao seu histórico
+    const z2Min = userPaceSettings?.targetPaceZ2Min || '7:00';
+    const z2Max = userPaceSettings?.targetPaceZ2Max || '7:35';
+    const z4Min = userPaceSettings?.targetPaceZ4Min || '5:45';
+    const z4Max = userPaceSettings?.targetPaceZ4Max || '6:30';
+
+    const z2ZoneFormatted = `${z2Min} - ${z2Max} min/km`;
+    const z4ZoneFormatted = `${z4Min} - ${z4Max} min/km`;
+
+    // 1. Definição da Estratégia
     if (report.status === 'ALERTA_OVERTRAINING' || report.acwrRatio > 1.4) {
       strategy = 'REGENERACAO_FORCADA';
       targetVolume = Number((report.currentWeekKm * 0.75).toFixed(2));
@@ -37,12 +56,12 @@ export class TrainingPlanService {
       rationale = 'Sua relação de carga (ACWR) está na Zona Doce. Aumentaremos o volume em ~8% para manter a evolução aeróbica.';
     }
 
-    // 2. Divisão do Volume Semanal nas Corridas (Mantendo sua proporção original)
-    const easyRunKm = Number((targetVolume * 0.30).toFixed(2));   // Terça
-    const qualityRunKm = Number((targetVolume * 0.25).toFixed(2)); // Quinta
-    const longRunKm = Number((targetVolume * 0.45).toFixed(2));    // Sábado
+    // 2. Divisão do Volume Semanal
+    const easyRunKm = Number((targetVolume * 0.30).toFixed(2));
+    const qualityRunKm = Number((targetVolume * 0.25).toFixed(2));
+    const longRunKm = Number((targetVolume * 0.45).toFixed(2));
 
-    // 3. Montagem da Matriz Completa de 7 Dias (Preenchendo os dias livres)
+    // 3. Montagem das Sessões
     const sessions: PlannedSession[] = [
       {
         dayOfWeek: 'Segunda-feira',
@@ -54,7 +73,7 @@ export class TrainingPlanService {
         dayOfWeek: 'Terça-feira',
         sessionType: 'Rodagem Leve (Z1/Z2)',
         targetDistanceKm: easyRunKm,
-        targetPaceZone: '6:30 - 7:30 min/km',
+        targetPaceZone: z2ZoneFormatted,
         description: 'Corrida em ritmo confortável para promover recuperação ativa e acumular base aeróbica.',
         videoSearchTerm: 'rodagem leve zona 2 corrida técnica'
       },
@@ -68,7 +87,7 @@ export class TrainingPlanService {
         dayOfWeek: 'Quinta-feira',
         sessionType: strategy === 'REGENERACAO_FORCADA' ? 'Rodagem Leve (Z1/Z2)' : 'Intervalado / Tiros (Z4/Z5)',
         targetDistanceKm: qualityRunKm,
-        targetPaceZone: strategy === 'REGENERACAO_FORCADA' ? '6:30 - 7:30 min/km' : '5:00 - 5:45 min/km',
+        targetPaceZone: strategy === 'REGENERACAO_FORCADA' ? z2ZoneFormatted : z4ZoneFormatted,
         description: strategy === 'REGENERACAO_FORCADA' 
           ? 'Troca de treino de tiro por rodagem leve devido ao pico de carga.' 
           : 'Aquecimento (1km) + Tiros de 400m/800m no ritmo alvo com descanso ativo.',
@@ -84,7 +103,7 @@ export class TrainingPlanService {
         dayOfWeek: 'Sábado',
         sessionType: 'Longão (Z2)',
         targetDistanceKm: longRunKm,
-        targetPaceZone: '6:30 - 7:15 min/km',
+        targetPaceZone: z2ZoneFormatted,
         description: 'Treino de resistência em ritmo constante. Mantenha a frequência cardíaca controlada.',
         videoSearchTerm: 'longão de corrida estratégia de pacing'
       },

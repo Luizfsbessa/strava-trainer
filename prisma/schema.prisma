@@ -29,6 +29,11 @@ model UserProfile {
   activityLevel      String
   goal               String
   dailyCalorieTarget Int
+  // Novas zonas personalizadas de Pace (em min/km)
+  targetPaceZ2Min    String   @default("7:00")
+  targetPaceZ2Max    String   @default("7:35")
+  targetPaceZ4Min    String   @default("5:45")
+  targetPaceZ4Max    String   @default("6:30")
   updatedAt          DateTime @updatedAt
 }
 
