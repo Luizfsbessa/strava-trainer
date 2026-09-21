@@ -309,16 +309,27 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            // Pega o volume alvo dinamico calculado para a semana (ou usa 20km como fallback)
-            const totalVol = parseFloat(window.currentWeeklyTarget || objectiveConfig.targetVolume || 23.33);
+            // Volume Alvo dinâmico lido da tela ou do estado
+            const totalVol = parseFloat(
+              document.getElementById('weeklyTargetVol')?.innerText || 
+              objectiveConfig.targetVolume || 
+              20
+            );
             
-            // Distribuição proporcional: Terça (25%), Quinta (25%), Sábado (50%)
             let calculatedDist = s.suggestedDist;
+            
             if (totalVol) {
+              // 1. Longo de Sábado = 45%
               if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
-                calculatedDist = `${(totalVol * 0.50).toFixed(1)} km`; // Ex: 11.7 km
-              } else {
-                calculatedDist = `${(totalVol * 0.25).toFixed(1)} km`; // Ex: 5.8 km
+                calculatedDist = `${(totalVol * 0.45).toFixed(1)} km`;
+              } 
+              // 2. Intervalado / Qualidade (Terça) = 25%
+              else if (s.sessionType && (s.sessionType.includes('Intervalado') || s.sessionType.includes('Tiros'))) {
+                calculatedDist = `${(totalVol * 0.25).toFixed(1)} km`;
+              } 
+              // 3. Rodagem Leve Z2 (Quinta) = 30%
+              else {
+                calculatedDist = `${(totalVol * 0.30).toFixed(1)} km`;
               }
             }
 
