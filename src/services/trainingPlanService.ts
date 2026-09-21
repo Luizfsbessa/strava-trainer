@@ -71,11 +71,13 @@ export class TrainingPlanService {
       },
       {
         dayOfWeek: 'Terça-feira',
-        sessionType: 'Rodagem Leve (Z1/Z2)',
-        targetDistanceKm: easyRunKm,
-        targetPaceZone: z2ZoneFormatted,
-        description: 'Corrida em ritmo confortável para promover recuperação ativa e acumular base aeróbica.',
-        videoSearchTerm: 'rodagem leve zona 2 corrida técnica'
+        sessionType: strategy === 'REGENERACAO_FORCADA' ? 'Rodagem Leve (Z1/Z2)' : 'Intervalado / Tiros (Z4/Z5)',
+        targetDistanceKm: qualityRunKm,
+        targetPaceZone: strategy === 'REGENERACAO_FORCADA' ? z2ZoneFormatted : z4ZoneFormatted,
+        description: strategy === 'REGENERACAO_FORCADA' 
+          ? 'Troca de treino de tiro por rodagem leve devido ao pico de carga.' 
+          : 'Aquecimento (1km) + Tiros de 400m/800m no ritmo alvo com descanso ativo.',
+        videoSearchTerm: strategy === 'REGENERACAO_FORCADA' ? 'rodagem regenerativa' : 'treino intervalado de tiros 400m corrida'
       },
       {
         dayOfWeek: 'Quarta-feira',
@@ -85,14 +87,12 @@ export class TrainingPlanService {
       },
       {
         dayOfWeek: 'Quinta-feira',
-        sessionType: strategy === 'REGENERACAO_FORCADA' ? 'Rodagem Leve (Z1/Z2)' : 'Intervalado / Tiros (Z4/Z5)',
-        targetDistanceKm: qualityRunKm,
-        targetPaceZone: strategy === 'REGENERACAO_FORCADA' ? z2ZoneFormatted : z4ZoneFormatted,
-        description: strategy === 'REGENERACAO_FORCADA' 
-          ? 'Troca de treino de tiro por rodagem leve devido ao pico de carga.' 
-          : 'Aquecimento (1km) + Tiros de 400m/800m no ritmo alvo com descanso ativo.',
-        videoSearchTerm: strategy === 'REGENERACAO_FORCADA' ? 'rodagem regenerativa' : 'treino intervalado de tiros 400m corrida'
-      },
+        sessionType: 'Rodagem Leve (Z1/Z2)',
+        targetDistanceKm: easyRunKm,
+        targetPaceZone: z2ZoneFormatted,
+        description: 'Corrida em ritmo confortável para promover recuperação ativa e acumular base aeróbica.',
+        videoSearchTerm: 'rodagem leve zona 2 corrida técnica'
+      },      
       {
         dayOfWeek: 'Sexta-feira',
         sessionType: 'Força Específica',
