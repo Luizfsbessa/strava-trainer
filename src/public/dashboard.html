@@ -308,15 +308,24 @@
           let detailsHtml = '';
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
+            
+            // Pega o volume total da semana (ex: 23.33)
+            const totalWeeklyVol = parseFloat(objectiveConfig.targetVolume || 20);
+            
+            // Define a proporção baseada no tipo de treino
+            let displayDist = s.suggestedDist;
+            if (totalWeeklyVol) {
+              if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
+                displayDist = `${(totalWeeklyVol * 0.50).toFixed(1)} km`; // 50% para o Longo
+              } else {
+                displayDist = `${(totalWeeklyVol * 0.25).toFixed(1)} km`; // 25% para cada treino de meio de semana
+              }
+            }
+
             detailsHtml = `
-              <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
+              <span>📏 Volume Proposto: <strong>${displayDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
               <span>🎯 Esforço: <strong>${s.effort}</strong></span>
-            `;
-          } else {
-            detailsHtml = `
-              <span>⏱️ Duração Proposta: <strong>${s.duration || '30 min'}</strong></span>
-              <span>🎯 Foco: <strong>${s.effort}</strong></span>
             `;
           }
 
