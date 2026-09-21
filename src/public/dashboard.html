@@ -309,21 +309,21 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            // Pega o volume total da semana (ex: 23.33)
-            const totalWeeklyVol = parseFloat(objectiveConfig.targetVolume || 20);
+            // Pega o volume alvo dinamico calculado para a semana (ou usa 20km como fallback)
+            const totalVol = parseFloat(window.currentWeeklyTarget || objectiveConfig.targetVolume || 23.33);
             
-            // Define a proporção baseada no tipo de treino
-            let displayDist = s.suggestedDist;
-            if (totalWeeklyVol) {
+            // Distribuição proporcional: Terça (25%), Quinta (25%), Sábado (50%)
+            let calculatedDist = s.suggestedDist;
+            if (totalVol) {
               if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
-                displayDist = `${(totalWeeklyVol * 0.50).toFixed(1)} km`; // 50% para o Longo
+                calculatedDist = `${(totalVol * 0.50).toFixed(1)} km`; // Ex: 11.7 km
               } else {
-                displayDist = `${(totalWeeklyVol * 0.25).toFixed(1)} km`; // 25% para cada treino de meio de semana
+                calculatedDist = `${(totalVol * 0.25).toFixed(1)} km`; // Ex: 5.8 km
               }
             }
 
             detailsHtml = `
-              <span>📏 Volume Proposto: <strong>${displayDist}</strong></span>
+              <span>📏 Volume Proposto: <strong>${calculatedDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
               <span>🎯 Esforço: <strong>${s.effort}</strong></span>
             `;
