@@ -249,7 +249,7 @@
 
           <hr class="divider">
 
-          <!-- PAINEL DE BADGES EVOLUTIVAS (MOVIDO PARA A SIDEBAR) -->
+          <!-- PAINEL DE BADGES EVOLUTIVAS -->
           <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <span>🏆 Conquistas & Evolução</span>
           </div>
@@ -499,6 +499,7 @@
         toggleManualFields();
         
         loadDashboard();
+        loadGamification();
         alert('Atividade salva com sucesso diretamente no banco de dados!');
       } catch (err) {
         console.error(err);
@@ -532,6 +533,7 @@
         }
 
         loadDashboard();
+        loadGamification();
         alert(`${fileInput.files.length} arquivo(s) GPX importado(s) com sucesso!`);
         document.getElementById('gpx-form').reset();
       } catch (err) {
@@ -560,6 +562,8 @@
 
         // 2. Renderizar Badges Evolutivas
         const container = document.getElementById('badgesContainer');
+        if (!container) return;
+        
         container.innerHTML = data.badges.map(b => {
           const isLocked = !b.isUnlocked;
           const activeIcon = b.activeTier ? b.activeTier.icon : '🔒';
