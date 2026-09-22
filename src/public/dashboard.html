@@ -240,7 +240,16 @@
         const data = await response.json();
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
-        const profile = data.profile || { age: 39, currentWeight: 103, targetWeight: 90.0, objective: "perda_peso" };
+        const rawProfile = data.profile || {};
+        const currentWeightNum = parseFloat(String(rawProfile.currentWeight || rawProfile.weight || 101.6).replace(',', '.'));
+        const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
+
+        const profile = {
+          age: rawProfile.age || 39,
+          currentWeight: currentWeightNum,
+          targetWeight: targetWeightNum,
+          objective: rawProfile.objective || "perda_peso"
+        };
 
         const obj = profile.objective || "perda_peso";
         const objectiveConfig = getObjectiveMatrix(obj);
