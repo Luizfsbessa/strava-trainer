@@ -64,65 +64,72 @@ const BADGE_CONFIGS = [
 
 router.get('/status', async (req, res) => {
   try {
-    // 1. Busca todos os treinos registrados no banco de dados
+    // 1. Busca todos os treinos do banco de dados
     const workouts = await prisma.workout.findMany();
 
-    // 2. Calcula total rodado e quantidade de treinos
     let totalKm = 0;
     let totalRuns = workouts.length;
+    let maxSingleRun = 0;
+    let validPaces: number[] = [];
 
     workouts.forEach((w: any) => {
       const dist = parseFloat(w.distanceKm || w.distance || 0);
+      const duration = parseFloat(w.durationMinutes || w.duration || 0);
+
       totalKm += dist;
+
+      // Guarda a maior distância num único treino
+      if (dist > maxSingleRun) {
+        maxSingleRun = dist;
+      }
+
+      // Calcula o pace em min/km para treinos válidos
+      if (dist > 0 && duration > 0) {
+        const pace = duration / dist;
+        validPaces.push(pace);
+      }
     });
 
-    // 3. Cálculo dinâmico de XP
-    // Cada km rodado = 10 XP | Cada treino realizado = 50 XP
-    const totalXp = Math.round(totalKm * 10) + (totalRuns * 50);
+    const bestPaceMins = validPaces.length > 0 ? Math.min(...validPaces) : 99;
 
-    // Nível atual (a cada 500 XP sobe de nível)
+    // 2. Cálculo de XP e Nível
+    const totalXp = Math.round(totalKm * 10) + (totalRuns * 50);
     const level = Math.floor(totalXp / 500) + 1;
     const xpInCurrentLevel = totalXp % 500;
     const xpForNextLevel = 500;
 
-    // 4. Mapeamento dinâmico das badges baseado nos treinos do banco
+    // 3. Mapeamento das Badges
     const badges = BADGE_CONFIGS.map(config => {
       let currentValue = 0;
+      let isPaceCategory = config.category === 'PACE';
 
-      if (config.category === 'DISTANCE') {
-        currentValue = parseFloat(totalKm.toFixed(1));
-      } else if (config.category === 'STREAK') {
-        currentValue = totalRuns;
-      } else {
-        currentValue = 0; // Categoria WEIGHT
-      }
-
-      // Descobre qual o patamar (tier) atual que o usuário atingiu
-      const activeTier = config.tiers.slice().reverse().find(t => currentValue >= t.target) || null;
-      const nextTier = config.tiers.find(t => currentValue < t.target) || null;
-
-      // Descobre a maior corrida única
-      const maxSingleRun = Math.max(0, ...workouts.map((w: any) => parseFloat(w.distanceKm || w.distance || 0)));
-
-      // Descobre o menor (melhor) pace registrado em corridas válidas
-      const validPaces = workouts
-        .filter((w: any) => parseFloat(w.distanceKm || w.distance) > 0 && parseFloat(w.durationMinutes || w.duration) > 0)
-        .map((w: any) => (parseFloat(w.durationMinutes || w.duration) / parseFloat(w.distanceKm || w.distance)));
-      const bestPaceMins = validPaces.length > 0 ? Math.min(...validPaces) : 99;
-
-      // Dentro do config.category:
       if (config.category === 'DISTANCE') {
         currentValue = parseFloat(totalKm.toFixed(1));
       } else if (config.category === 'STREAK') {
         currentValue = totalRuns;
       } else if (config.category === 'SINGLE_RUN') {
         currentValue = parseFloat(maxSingleRun.toFixed(1));
-      } else if (config.category === 'PACE') {
+      } else if (isPaceCategory) {
         currentValue = parseFloat(bestPaceMins.toFixed(1));
       } else {
         currentValue = 0; // WEIGHT
       }
-      
+
+      // Lógica de desbloqueio considerando que no PACE quanto menor, melhor
+      const activeTier = config.tiers.slice().reverse().find(t => {
+        if (isPaceCategory) {
+          return currentValue > 0 && currentValue <= t.target;
+        }
+        return currentValue >= t.target;
+      }) || null;
+
+      const nextTier = config.tiers.find(t => {
+        if (isPaceCategory) {
+          return currentValue === 0 || currentValue > t.target;
+        }
+        return currentValue < t.target;
+      }) || null;
+
       return {
         id: config.code,
         title: config.title,
