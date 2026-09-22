@@ -36,7 +36,7 @@
       margin: 0 auto; 
       padding: 30px 20px; 
       box-sizing: border-box; 
-    }
+    } 
     
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px;}
 
@@ -176,7 +176,7 @@
       </div>
     </div>
 
-    <!-- BANNER DE GAMIFICAÇÃO / NÍVEL DE ATLETA (RETÂNGULO VERDE) -->
+    <!-- BANNER DE GAMIFICAÇÃO / NÍVEL DE ATLETA -->
     <div class="card" style="margin-bottom: 20px; background: #0f172a; border: 1px solid #1e293b; padding: 16px 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -246,21 +246,21 @@
             </div>
             <button type="submit" class="btn">Salvar Atividade</button>
           </form>
+
+          <hr class="divider">
+
+          <!-- PAINEL DE BADGES EVOLUTIVAS (MOVIDO PARA A SIDEBAR) -->
+          <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🏆 Conquistas & Evolução</span>
+          </div>
+          <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Renderizado dinamicamente pelo JavaScript -->
+          </div>
+
         </div>
       </div>
     </div>
   </div>
-
-  <!-- PAINEL DE BADGES EVOLUTIVAS (RETÂNGULO VERMELHO) -->
-  <div class="card" style="margin-top: 20px;">
-    <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-      <span>🏆 Conquistas & Evolução</span>
-    </div>
-    <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;">
-      <!-- Renderizado dinamicamente pelo JavaScript -->
-    </div>
-  </div>
-
 
   <script>
     document.getElementById('activityDate').valueAsDate = new Date();
@@ -350,7 +350,6 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            // Pega o volume total exibido no topo da página
             const totalVol = parseFloat(document.getElementById('weeklyTargetVol')?.innerText || objectiveConfig.targetVolume || 23.33);
             
             let calculatedDist = s.suggestedDist;
@@ -595,7 +594,6 @@
       }
     }
 
-    // Chamar ao carregar a página
     document.addEventListener('DOMContentLoaded', () => {
       loadGamification();
     });
