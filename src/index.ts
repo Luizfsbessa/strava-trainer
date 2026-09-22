@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import trainingRoutes from './routes/trainingRoutes';
 import workoutRoutes from './routes/workoutRoutes';
 import userRoutes from './routes/userRoutes';
+import gamificationRoutes from './routes/gamificationRoutes';
 
 dotenv.config();
 
@@ -24,8 +25,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/trainings', trainingRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend rodando na porta ${PORT}`);
-  console.log(`📁 Painel web disponível em: http://localhost:${PORT}/dashboard.html`);
+  console.log(`📂 Painel web disponível em: http://localhost:${PORT}/dashboard.html`);
 });
