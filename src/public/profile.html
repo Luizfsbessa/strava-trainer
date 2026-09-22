@@ -91,10 +91,13 @@
     </div>
 
     <!-- Gráfico de Evolução de Peso -->
-    <div class="card" id="weight-chart-card" style="display: none;">
+    <div class="card">
       <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">📉 Evolução do Peso Corporal</div>
-      <div style="max-height: 280px; position: relative;">
+      <div id="chartContainer" style="max-height: 280px; position: relative;">
         <canvas id="weightChart"></canvas>
+      </div>
+      <div id="noDataMsg" style="display: none; color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 14px;">
+        Nenhum registro de peso encontrado. Clique em "Salvar Alterações" acima para registrar seu peso no histórico.
       </div>
     </div>
 
@@ -173,12 +176,20 @@
     async function loadWeightChart() {
       try {
         const res = await fetch('/api/user/weight-history');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('Falha ao buscar histórico');
         const history = await res.json();
 
-        if (!history || history.length === 0) return;
+        const chartContainer = document.getElementById('chartContainer');
+        const noDataMsg = document.getElementById('noDataMsg');
 
-        document.getElementById('weight-chart-card').style.display = 'block';
+        if (!history || history.length === 0) {
+          chartContainer.style.display = 'none';
+          noDataMsg.style.display = 'block';
+          return;
+        }
+
+        chartContainer.style.display = 'block';
+        noDataMsg.style.display = 'none';
 
         const labels = history.map(item => new Date(item.date).toLocaleDateString('pt-BR'));
         const weights = history.map(item => item.weight);
@@ -245,7 +256,6 @@
         }
       }
 
-      // Tenta buscar o perfil dinâmico da API para sincronizar
       try {
         const res = await fetch('/api/user/profile');
         if (res.ok) {
@@ -277,7 +287,6 @@
       const objectiveVal = document.getElementById('pObjective').value;
       const ageVal = calculateAge(birthDateVal);
 
-      // 1. Grava no localStorage para manter a UI reativa localmente
       const saved = localStorage.getItem('strava_trainer_state');
       let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
       if (!data.profile) data.profile = {};
@@ -289,7 +298,6 @@
       data.profile.objective = objectiveVal;
       localStorage.setItem('strava_trainer_state', JSON.stringify(data));
 
-      // 2. Envia para o backend para persistir no banco e gerar ponto no histórico
       try {
         await fetch('/api/user/profile', {
           method: 'POST',
