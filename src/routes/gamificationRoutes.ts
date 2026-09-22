@@ -38,6 +38,27 @@ const BADGE_CONFIGS = [
       { tier: 3, target: 25, name: 'Hábito de Aço', icon: '🛡️', xp: 500 },
       { tier: 4, target: 50, name: 'Inabalável', icon: '👑', xp: 1000 }
     ]
+  },
+  {
+    code: 'LONGEST_RUN_TRAIL',
+    title: 'Maior Distância Única',
+    category: 'SINGLE_RUN',
+    tiers: [
+      { tier: 1, target: 5, name: 'Primeiros 5k', icon: '🥉', xp: 100 },
+      { tier: 2, target: 10, name: 'Superou os 10k', icon: '🥈', xp: 250 },
+      { tier: 3, target: 21, name: 'Meia Maratona', icon: '🥇', xp: 600 },
+      { tier: 4, target: 42, name: 'Maratonista', icon: '👑', xp: 1500 }
+    ]
+  },
+  {
+    code: 'SPEED_PACE_TRAIL',
+    title: 'Mestre do Pace',
+    category: 'PACE',
+    tiers: [
+      { tier: 1, target: 6, name: 'Abaixo de 6:00/km', icon: '🏃‍♂️', xp: 150 },
+      { tier: 2, target: 5, name: 'Abaixo de 5:00/km', icon: '⚡', xp: 350 },
+      { tier: 3, target: 4.5, name: 'Sub 4:30/km', icon: '🔥', xp: 800 }
+    ]
   }
 ];
 
@@ -80,6 +101,28 @@ router.get('/status', async (req, res) => {
       const activeTier = config.tiers.slice().reverse().find(t => currentValue >= t.target) || null;
       const nextTier = config.tiers.find(t => currentValue < t.target) || null;
 
+      // Descobre a maior corrida única
+      const maxSingleRun = Math.max(0, ...workouts.map((w: any) => parseFloat(w.distanceKm || w.distance || 0)));
+
+      // Descobre o menor (melhor) pace registrado em corridas válidas
+      const validPaces = workouts
+        .filter((w: any) => parseFloat(w.distanceKm || w.distance) > 0 && parseFloat(w.durationMinutes || w.duration) > 0)
+        .map((w: any) => (parseFloat(w.durationMinutes || w.duration) / parseFloat(w.distanceKm || w.distance)));
+      const bestPaceMins = validPaces.length > 0 ? Math.min(...validPaces) : 99;
+
+      // Dentro do config.category:
+      if (config.category === 'DISTANCE') {
+        currentValue = parseFloat(totalKm.toFixed(1));
+      } else if (config.category === 'STREAK') {
+        currentValue = totalRuns;
+      } else if (config.category === 'SINGLE_RUN') {
+        currentValue = parseFloat(maxSingleRun.toFixed(1));
+      } else if (config.category === 'PACE') {
+        currentValue = parseFloat(bestPaceMins.toFixed(1));
+      } else {
+        currentValue = 0; // WEIGHT
+      }
+      
       return {
         id: config.code,
         title: config.title,
