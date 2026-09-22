@@ -40,6 +40,19 @@ router.post('/profile', async (req, res) => {
       },
     });
 
+    if (data.weightKg) {
+      const weightValue = typeof data.weightKg === 'string' 
+        ? parseFloat(String(data.weightKg).replace(',', '.')) 
+        : Number(data.weightKg);
+
+      await (prisma as any).weightLog.create({
+        data: {
+          weight: weightValue,
+          date: new Date()
+        }
+      });
+    }
+
     return res.status(200).json({
       message: 'Perfil atualizado e calorias calibradas com base nos seus treinos reais!',
       profile: userProfile,
@@ -76,6 +89,18 @@ router.get('/profile', async (req, res) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro ao buscar perfil.' });
+  }
+});
+
+// GET: Buscar histórico de peso para o gráfico
+router.get('/weight-history', async (req, res) => {
+  try {
+    const history = await (prisma as any).weightLog.findMany({
+      orderBy: { date: 'asc' }
+    });
+    return res.json(history);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao procurar histórico de peso.' });
   }
 });
 

@@ -63,3 +63,10 @@ model Profile {
   goal             String   @default("WEIGHT_LOSS")
   updatedAt        DateTime @updatedAt
 }
+
+model WeightLog {
+  id        String   @id @default(uuid())
+  weight    Float
+  date      DateTime @default(now())
+  userId    String?
+}
