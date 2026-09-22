@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Strava Trainer - Meu Perfil e Objetivos</title>
+  <!-- Biblioteca Chart.js para renderização de gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg-main: #090d16;
@@ -15,11 +17,11 @@
     }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 30px; }
     .container { 
-  max-width: 1200px; 
-  margin: 0 auto; 
-  padding: 30px 20px; 
-  box-sizing: border-box; 
-}
+      max-width: 1200px; 
+      margin: 0 auto; 
+      padding: 30px 20px; 
+      box-sizing: border-box; 
+    }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
     h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; }
     .nav-links { display: flex; gap: 12px; }
@@ -88,6 +90,14 @@
       </form>
     </div>
 
+    <!-- Gráfico de Evolução de Peso -->
+    <div class="card" id="weight-chart-card" style="display: none;">
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">📉 Evolução do Peso Corporal</div>
+      <div style="max-height: 280px; position: relative;">
+        <canvas id="weightChart"></canvas>
+      </div>
+    </div>
+
     <div class="card">
       <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">⚡ Suas Zonas de Frequência Cardíaca</div>
       <div id="fcmax-subtitle" style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Calculando com base na data de nascimento...</div>
@@ -107,6 +117,8 @@
   </div>
 
   <script>
+    let weightChartInstance = null;
+
     function calculateAge(birthDateString) {
       if (!birthDateString) return 39;
       const birthDate = new Date(birthDateString);
@@ -158,7 +170,59 @@
       }
     }
 
-    function loadProfile() {
+    async function loadWeightChart() {
+      try {
+        const res = await fetch('/api/user/weight-history');
+        if (!res.ok) return;
+        const history = await res.json();
+
+        if (!history || history.length === 0) return;
+
+        document.getElementById('weight-chart-card').style.display = 'block';
+
+        const labels = history.map(item => new Date(item.date).toLocaleDateString('pt-BR'));
+        const weights = history.map(item => item.weight);
+
+        const ctx = document.getElementById('weightChart').getContext('2d');
+        if (weightChartInstance) {
+          weightChartInstance.destroy();
+        }
+
+        weightChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Peso (kg)',
+              data: weights,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 5,
+              pointHoverRadius: 7,
+              pointBackgroundColor: '#10b981'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#f8fafc', font: { size: 12 } } }
+            },
+            scales: {
+              x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+              y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Erro ao carregar gráfico de peso:', err);
+      }
+    }
+
+    async function loadProfile() {
       const saved = localStorage.getItem('strava_trainer_state');
       if (saved) {
         const data = JSON.parse(saved);
@@ -180,29 +244,73 @@
           onBirthDateChange();
         }
       }
+
+      // Tenta buscar o perfil dinâmico da API para sincronizar
+      try {
+        const res = await fetch('/api/user/profile');
+        if (res.ok) {
+          const apiData = await res.json();
+          if (apiData.profile) {
+            document.getElementById('pWeight').value = apiData.profile.weightKg;
+            if (apiData.profile.age) {
+              const currentYear = new Date().getFullYear();
+              const estimatedYear = currentYear - apiData.profile.age;
+              if (!document.getElementById('pBirthDate').value) {
+                document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
+              }
+            }
+            onBirthDateChange();
+          }
+        }
+      } catch (e) {
+        console.log('Sem conexão com API local ou modo offline.');
+      }
+
+      await loadWeightChart();
     }
 
-    function saveProfile(event) {
+    async function saveProfile(event) {
       event.preventDefault();
+      const birthDateVal = document.getElementById('pBirthDate').value;
+      const weightVal = parseFloat(document.getElementById('pWeight').value);
+      const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
+      const objectiveVal = document.getElementById('pObjective').value;
+      const ageVal = calculateAge(birthDateVal);
+
+      // 1. Grava no localStorage para manter a UI reativa localmente
       const saved = localStorage.getItem('strava_trainer_state');
       let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
-
       if (!data.profile) data.profile = {};
       
-      const birthDateVal = document.getElementById('pBirthDate').value;
-      
       data.profile.birthDate = birthDateVal;
-      data.profile.age = calculateAge(birthDateVal);
-      data.profile.currentWeight = parseFloat(document.getElementById('pWeight').value);
-      data.profile.targetWeight = parseFloat(document.getElementById('pTargetWeight').value);
-      data.profile.objective = document.getElementById('pObjective').value;
-
+      data.profile.age = ageVal;
+      data.profile.currentWeight = weightVal;
+      data.profile.targetWeight = targetWeightVal;
+      data.profile.objective = objectiveVal;
       localStorage.setItem('strava_trainer_state', JSON.stringify(data));
+
+      // 2. Envia para o backend para persistir no banco e gerar ponto no histórico
+      try {
+        await fetch('/api/user/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            age: ageVal,
+            gender: 'MALE',
+            weightKg: weightVal,
+            heightCm: 180,
+            goal: objectiveVal === 'perda_peso' ? 'WEIGHT_LOSS' : 'MAINTENANCE'
+          })
+        });
+      } catch (e) {
+        console.error('Erro ao enviar dados para a API:', e);
+      }
+
       alert('Perfil atualizado com sucesso! Zonas de esforço e parâmetros recalculados.');
-      window.location.href = 'dashboard.html';
+      await loadWeightChart();
     }
 
-    loadProfile();
+    document.addEventListener('DOMContentLoaded', loadProfile);
   </script>
 </body>
 </html>
