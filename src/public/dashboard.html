@@ -309,26 +309,16 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            // Volume Alvo dinâmico lido da tela ou do estado
-            const totalVol = parseFloat(
-              document.getElementById('weeklyTargetVol')?.innerText || 
-              objectiveConfig.targetVolume || 
-              20
-            );
+            // Pega o volume total exibido no topo da página
+            const totalVol = parseFloat(document.getElementById('weeklyTargetVol')?.innerText || objectiveConfig.targetVolume || 23.33);
             
             let calculatedDist = s.suggestedDist;
-            
             if (totalVol) {
-              // 1. Longo de Sábado = 45%
               if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
                 calculatedDist = `${(totalVol * 0.45).toFixed(1)} km`;
-              } 
-              // 2. Intervalado / Qualidade (Terça) = 25%
-              else if (s.sessionType && (s.sessionType.includes('Intervalado') || s.sessionType.includes('Tiros'))) {
+              } else if (s.sessionType && (s.sessionType.includes('Intervalado') || s.sessionType.includes('Tiros'))) {
                 calculatedDist = `${(totalVol * 0.25).toFixed(1)} km`;
-              } 
-              // 3. Rodagem Leve Z2 (Quinta) = 30%
-              else {
+              } else {
                 calculatedDist = `${(totalVol * 0.30).toFixed(1)} km`;
               }
             }
@@ -339,7 +329,6 @@
               <span>🎯 Esforço: <strong>${s.effort}</strong></span>
             `;
           }
-
           return `
             <div class="card">
               <div class="day">${s.dayOfWeek} (Proposto vs Executado)</div>
