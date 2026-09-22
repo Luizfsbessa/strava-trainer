@@ -70,3 +70,28 @@ model WeightLog {
   date      DateTime @default(now())
   userId    String?
 }
+
+model UserProgress {
+  id          Int      @id @default(autoincrement())
+  xp          Int      @default(0)
+  level       Int      @default(1)
+  streakDays  Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Badge {
+  id          Int         @id @default(autoincrement())
+  code        String      @unique // ex: "DISTENCE_TRAIL", "WEIGHT_LOSS_TRAIL", "CONSISTENCY_TRAIL"
+  title       String
+  category    String      // DISTANCE, WEIGHT, STREAK
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id          Int      @id @default(autoincrement())
+  badgeId     Int
+  currentTier Int      @default(1) // Nível da badge (1: Bronze, 2: Prata, 3: Ouro, 4: Queniano)
+  currentValue Float   @default(0) // Progresso atual (ex: 45.2 km acumulados)
+  unlockedAt  DateTime @default(now())
+  badge       Badge    @relation(fields: [badgeId], references: [id])
+}
