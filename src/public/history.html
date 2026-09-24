@@ -44,14 +44,13 @@
     .cal-cell.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
     .cal-cell.has-mobility { border-color: var(--accent-purple); background: linear-gradient(135deg, #131b2e 0%, #2e1065 100%); }
     .cal-cell.has-drills { border-color: var(--accent-pink); background: linear-gradient(135deg, #131b2e 0%, #500724 100%); }
-   /* Seleciona qualquer célula que NÃO contenha uma tag <img> de ícone */
-    .cal-cell:not(:has(img)) {
-      background: rgba(255, 255, 255, 0.03) !important;
+   /* Pega especificamente a célula sem imagem de treino dentro da grid */
+    .calendar-grid .cal-cell:not(:has(img)) {
+      background: rgba(255, 255, 255, 0.02) !important;
       border: 1px dashed rgba(255, 255, 255, 0.08) !important;
     }
 
-    /* Suaviza a cor do número nos dias sem treino */
-    .cal-cell:not(:has(img)) .cal-date {
+    .calendar-grid .cal-cell:not(:has(img)) .cal-date {
       color: #475569 !important;
       opacity: 0.5;
     }
