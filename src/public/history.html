@@ -238,27 +238,41 @@
       return `${mins}:${secs < 10 ? '0' : ''}${secs} /km`;
     }
 
-    // Identifica o turno com base na hora do treino do Strava
+    // Retorna a hora corretamente considerando a string ISO do Strava
     function getShift(dateString) {
       if (!dateString) return 'manha';
-      const d = new Date(dateString);
-      const hour = d.getHours();
+      
+      // Tenta extrair a hora direto da string (ex: "2026-09-02T08:30:00") para evitar problemas de timezone
+      let hour = 8; // fallback para manhã
+      
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        const timePart = dateString.split('T')[1];
+        if (timePart) {
+          hour = parseInt(timePart.split(':')[0], 10);
+        }
+      } else {
+        const d = new Date(dateString);
+        if (!isNaN(d.getTime())) {
+          hour = d.getHours();
+        }
+      }
+
       if (hour >= 6 && hour < 12) return 'manha';
       if (hour >= 12 && hour < 18) return 'tarde';
-      return 'noite';
+      return 'noite'; // 18h às 05h59
     }
 
-    // Mapeia o tipo e o turno diretamente para os arquivos existentes
+    // Retorna a Tag <img> apontando para a raiz /assets/icons/
     function getWorkoutIconTag(type, dateString) {
       const shift = getShift(dateString);
       const typeLower = String(type || '').toLowerCase().trim();
       
-      let iconName = 'corrida'; // Padrão
+      let iconName = 'corrida';
 
       if (typeLower === 'mobilidade') {
-        // Como você não tem mobilidade-tarde.png na pasta, usamos manha como fallback
-        iconName = (shift === 'tarde') ? 'mobilidade-manha' : `mobilidade-${shift}`;
-        return `<img src="assets/icons/${iconName}.png" class="workout-icon" alt="Mobilidade" />`;
+        // Caso o turno seja tarde, usamos 'manha' como fallback por não existir mobilidade-tarde.png
+        const targetShift = (shift === 'tarde') ? 'manha' : shift;
+        return `<img src="/assets/icons/mobilidade-${targetShift}.png" class="workout-icon" alt="Mobilidade" onerror="this.style.display='none'" />`;
       }
       
       if (typeLower === 'educativo' || typeLower === 'educativos' || typeLower === 'drills') {
@@ -269,8 +283,8 @@
         iconName = 'corrida';
       }
 
-      const src = `assets/icons/${iconName}-${shift}.png`;
-      return `<img src="${src}" class="workout-icon" alt="${type || 'Treino'}" />`;
+      const src = `/assets/icons/${iconName}-${shift}.png`;
+      return `<img src="${src}" class="workout-icon" alt="${type || 'Treino'}" onerror="this.style.display='none'" />`;
     }
 
     function renderCalendar(workouts) {
