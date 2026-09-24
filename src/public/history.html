@@ -44,7 +44,8 @@
     .cal-cell.has-workout { border-color: var(--accent-blue); background: linear-gradient(135deg, #131b2e 0%, #172554 100%); }
     .cal-cell.has-mobility { border-color: var(--accent-purple); background: linear-gradient(135deg, #131b2e 0%, #2e1065 100%); }
     .cal-cell.has-drills { border-color: var(--accent-pink); background: linear-gradient(135deg, #131b2e 0%, #500724 100%); }
-    
+    .cal-cell:not(.has-workout):not(.has-mobility):not(.has-drills) { background: rgba(15, 23, 42, 0.25) !important; border: 1px dashed rgba(255, 255, 255, 0.06) !important;}
+    .cal-cell:not(.has-workout):not(.has-mobility):not(.has-drills) .cal-date { color: #475569 !important; opacity: 0.6; }
     .cal-date { font-size: 11px; color: var(--text-muted); font-weight: 600; align-self: flex-start; }
     .cal-content { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 15px; margin: auto 0; }
 
