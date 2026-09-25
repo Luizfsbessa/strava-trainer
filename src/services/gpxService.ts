@@ -13,43 +13,64 @@ export class GpxService {
     }
 
     const points = track.points as any[];
+    const validPoints = points.filter(p => p.lat && p.lon);
 
     let totalDistanceMeters = 0;
     let movingSeconds = 0;
-    const validPoints = [];
+    const splits: any[] = [];
 
-    // Filtra e calcula com precisão usando Haversine e timestamps reais
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (p.lat && p.lon) {
-        validPoints.push(p);
-      }
-    }
+    let currentSplitDist = 0;
+    let currentSplitSecs = 0;
+    let splitIndex = 1;
+    let lastPoint: any = null;
 
-    for (let i = 0; i < validPoints.length - 1; i++) {
-      const p1 = validPoints[i];
-      const p2 = validPoints[i + 1];
-      
-      const dist = GpxService.haversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
-      totalDistanceMeters += dist;
+    for (let i = 0; i < validPoints.length; i++) {
+      const p = validPoints[i];
 
-      if (p1.time && p2.time) {
-        const t1 = new Date(p1.time).getTime();
-        const t2 = new Date(p2.time).getTime();
-        const diffSecs = (t2 - t1) / 1000;
+      if (lastPoint) {
+        const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
+        totalDistanceMeters += dist;
+        currentSplitDist += dist;
 
-        // Considera apenas delta de tempo realista entre pontos (ignora pausas > 10 segundos parado)
-        if (diffSecs > 0 && diffSecs < 10) {
-          movingSeconds += diffSecs;
+        if (lastPoint.time && p.time) {
+          const t1 = new Date(lastPoint.time).getTime();
+          const t2 = new Date(p.time).getTime();
+          const diffSecs = (t2 - t1) / 1000;
+
+          if (diffSecs > 0 && diffSecs < 15) {
+            movingSeconds += diffSecs;
+            currentSplitSecs += diffSecs;
+          }
+        }
+
+        // Se completou 1 km na volta atual
+        if (currentSplitDist >= 1000) {
+          const lapMin = Math.floor(currentSplitSecs / 60);
+          const lapSec = Math.round(currentSplitSecs % 60);
+          splits.push({
+            lap_index: splitIndex++,
+            distance_km: 1.0,
+            moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+            pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+          });
+          currentSplitDist -= 1000;
+          currentSplitSecs = 0;
         }
       }
+      lastPoint = p;
     }
 
-    // Fallback caso os pontos não tenham timestamp adequado
-    if (movingSeconds === 0 && validPoints.length > 1 && validPoints[0].time && validPoints[validPoints.length - 1].time) {
-      const start = new Date(validPoints[0].time).getTime();
-      const end = new Date(validPoints[validPoints.length - 1].time).getTime();
-      movingSeconds = Math.max(0, (end - start) / 1000);
+    // Adiciona o resto final se sobrou fração de km
+    if (currentSplitDist > 50) {
+      const remKm = currentSplitDist / 1000;
+      const lapMin = Math.floor(currentSplitSecs / 60);
+      const lapSec = Math.round(currentSplitSecs % 60);
+      splits.push({
+        lap_index: splitIndex,
+        distance_km: Number(remKm.toFixed(2)),
+        moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+        pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+      });
     }
 
     const distanceKm = totalDistanceMeters > 0 ? Number((totalDistanceMeters / 1000).toFixed(2)) : 0;
@@ -80,6 +101,7 @@ export class GpxService {
       pace_medio: paceMinPerKm,
       elevacao_ganho_m: Math.round(typeof track.elevation?.pos === 'number' ? track.elevation.pos : 0),
       data: activityDate,
+      laps: splits 
     };
   }
 
