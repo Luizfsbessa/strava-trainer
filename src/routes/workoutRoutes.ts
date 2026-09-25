@@ -10,12 +10,11 @@ import { StravaService } from '../services/stravaService';
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
 
-// Cache temporário em memória para armazenar os laps/splits dos arquivos GPX por workoutId
+// Cache em memória para os laps
 const gpxLapsCache = new Map<string, any[]>();
 
 // 1. ROTAS ESPECÍFICAS PRIMEIRO
 
-// GET: Retorna a análise e progressão semanal
 router.get('/analytics', async (req, res) => {
   try {
     const workouts = await prisma.workout.findMany({
@@ -34,7 +33,6 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
-// GET: Retorna o plano de treino
 router.get('/training-plan', async (req, res) => {
   try {
     const workouts = await prisma.workout.findMany();
@@ -51,19 +49,18 @@ router.get('/training-plan', async (req, res) => {
   }
 });
 
-// GET: Busca voltas (Laps / Tiros) reais salvas no cache do GPX ou do Strava
+// GET: Busca voltas (Laps / Tiros) reais
 router.get('/strava/laps/:activityId', async (req, res) => {
   try {
     const { activityId } = req.params;
 
-    // 1. Verifica se os laps estão no cache do GPX
+    // 1. Verifica se está no cache
     if (gpxLapsCache.has(activityId)) {
       return res.json(gpxLapsCache.get(activityId));
     }
 
     let accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.STRAVA_ACCESS_TOKEN || '';
     
-    // 2. Tenta buscar do Strava se for um ID numérico real
     if (!isNaN(Number(activityId))) {
       try {
         const laps = await StravaService.getActivityLaps(accessToken, activityId);
@@ -75,7 +72,6 @@ router.get('/strava/laps/:activityId', async (req, res) => {
       }
     }
 
-    // 3. Fallback: busca o treino no banco local para gerar voltas dinâmicas
     const workout = await prisma.workout.findUnique({
       where: { id: activityId }
     });
@@ -84,7 +80,22 @@ router.get('/strava/laps/:activityId', async (req, res) => {
       return res.status(404).json({ error: 'Treino não encontrado.' });
     }
 
+    // Se o treino foi importado via GPX mas o cache limpou, podemos simular os tiros reais baseados na distância e variação coerente, 
+    // ou se preferir guardar o JSON no campo `type` do banco para persistir entre reboots:
     const wAny = workout as any;
+    if (wAny.type && wAny.type.startsWith('[')) {
+      try {
+        const parsedLaps = JSON.parse(wAny.type);
+        if (Array.isArray(parsedLaps) && parsedLaps.length > 0) {
+          gpxLapsCache.set(activityId, parsedLaps);
+          return res.json(parsedLaps);
+        }
+      } catch (e) {
+        // ignora erro de parse se não for json
+      }
+    }
+
+    // Fallback caso não tenha laps guardados
     const totalDist = Number(workout.distanceKm || 0);
     const totalSecs = Number(wAny.moving_time_sec || (workout.durationMinutes ? workout.durationMinutes * 60 : 0));
 
@@ -149,9 +160,13 @@ router.post('/upload-gpx', upload.array('files', 50), async (req, res) => {
       const fileBuffer = fs.readFileSync(file.path);
       const gpxData = GpxService.parseGpxContent(fileBuffer);
 
+      // Persistimos o array de laps em formato JSON dentro da coluna `type` para nunca mais perder ao reiniciar o servidor!
+      const lapsJsonString = gpxData.laps ? JSON.stringify(gpxData.laps) : 'run';
+
       const newWorkout = await prisma.workout.create({
         data: {
           title: gpxData.nome_atividade || 'Corrida importada',
+          type: lapsJsonString,
           distanceKm: Number(gpxData.distancia_km || 0),
           durationMinutes: Number(gpxData.duracao_minutos || 0),
           pace: String(gpxData.pace_medio || '00:00'),
@@ -162,7 +177,6 @@ router.post('/upload-gpx', upload.array('files', 50), async (req, res) => {
         },
       });
 
-      // Armazena os splits calculados no cache associado ao ID do novo treino
       if (gpxData.laps && gpxData.laps.length > 0) {
         gpxLapsCache.set(newWorkout.id, gpxData.laps);
       }
@@ -187,7 +201,6 @@ router.post('/upload-gpx', upload.array('files', 50), async (req, res) => {
 
 // 2. ROTAS RAIZ
 
-// GET: Retorna o histórico de treinos
 router.get('/', async (req, res) => {
   try {
     const workouts = await prisma.workout.findMany({
@@ -207,8 +220,15 @@ router.get('/', async (req, res) => {
         paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
       }
 
+      // Limpa o campo type se ele contiver o JSON dos laps para não quebrar a UI principal se ela esperar uma string de tipo
+      let displayType = w.type;
+      if (displayType && displayType.startsWith('[')) {
+        displayType = 'run';
+      }
+
       return {
         ...w,
+        type: displayType,
         moving_time_sec: movingSecs,
         durationMinutes: durationMin,
         calculatedPace: paceFormatted,
@@ -223,7 +243,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST: Cadastro manual
 router.post('/', async (req, res) => {
   try {
     const { distanceKm, durationMinutes, activityDate, type, pace, elevationMeters, title } = req.body;
@@ -254,12 +273,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE: Remove uma atividade pelo ID
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Remove do banco e do cache de laps
     await prisma.workout.delete({
       where: { id },
     });
