@@ -94,8 +94,8 @@
     .laps-table tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
     .laps-table .fast-lap { color: var(--accent-blue); font-weight: bold; }
 
-    .view-toggle-btn { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-    .view-toggle-btn.active { background: var(--accent-blue); color: #000; font-weight: bold; }
+    .view-toggle-btn { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 6px; transition: all 0.2s; }
+    .view-toggle-btn.active { background: var(--accent-blue); color: #000; font-weight: bold; border-color: var(--accent-blue); }
     
     .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); }
   </style>
@@ -302,7 +302,13 @@
       
       container.innerHTML = workouts.map((w, index) => {
         const dist = Number(w.distanceKm || w.distance || 0);
-        const movingSecs = Number(w.moving_time_sec || (w.durationMinutes ? w.durationMinutes * 60 : 0));
+        
+        // Pega o tempo ativo de movimento se existir ou calcula em segundos
+        let movingSecs = Number(w.moving_time_sec || w.movingTime);
+        if (!movingSecs && w.durationMinutes) {
+          movingSecs = Math.round(w.durationMinutes * 60);
+        }
+
         const durationFormatted = formatTimeHMS(movingSecs);
         const pace = calculatePace(dist, movingSecs);
         const actDate = w.activityDate || w.date;
@@ -393,7 +399,7 @@
             }
           }
         } catch (e) {
-          console.log('Erro ao carregar laps:', e);
+          console.log('Sem dados de laps do Strava:', e);
         }
       }
 
@@ -402,13 +408,13 @@
         const totalKmFull = Math.ceil(dist);
         const baseSecsPerKm = movingSecs / dist;
         let splits = [];
-        let minSecs = 99999, maxSecs = 0, fastestKm = 1, slowestKm = 1;
+        let minSecs = 99999, maxSecs = 0;
 
         for (let km = 1; km <= totalKmFull; km++) {
           const variance = Math.sin(km * 0.8) * 20 + (km === totalKmFull ? 10 : 0);
           let kmSecs = Math.max(210, Math.min(720, baseSecsPerKm + variance));
-          if (kmSecs < minSecs) { minSecs = kmSecs; fastestKm = km; }
-          if (kmSecs > maxSecs) { maxSecs = kmSecs; slowestKm = km; }
+          if (kmSecs < minSecs) minSecs = kmSecs;
+          if (kmSecs > maxSecs) maxSecs = kmSecs;
           splits.push({ km, secs: kmSecs });
         }
 
@@ -453,11 +459,13 @@
           <span style="font-size: 13px; font-weight: bold; color: var(--text-main);">Análise e Desempenho do Treino</span>
           <div>
             <button class="view-toggle-btn active" id="btn-splits-${id}" onclick="toggleView('${id}', 'splits')">Splits (por KM)</button>
-            ${lapsHtml ? `<button class="view-toggle-btn" id="btn-laps-${id}" onclick="toggleView('${id}', 'laps')">Voltas / Tiros</button>` : ''}
+            <button class="view-toggle-btn" id="btn-laps-${id}" onclick="toggleView('${id}', 'laps')">Voltas / Tiros</button>
           </div>
         </div>
         <div id="view-splits-${id}">${splitsHtml}</div>
-        ${lapsHtml ? `<div id="view-laps-${id}" style="display: none;">${lapsHtml}</div>` : ''}
+        <div id="view-laps-${id}" style="display: none;">
+          ${lapsHtml || '<div style="color: var(--text-muted); font-size: 12px; padding: 10px 0;">Nenhuma volta manual/tiro registrado nesta atividade.</div>'}
+        </div>
       `;
     }
 

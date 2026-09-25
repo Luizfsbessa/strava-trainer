@@ -122,7 +122,29 @@ router.get('/', async (req, res) => {
     const workouts = await prisma.workout.findMany({
       orderBy: { activityDate: 'desc' },
     });
-    return res.json(workouts);
+
+    // Mapeamento dinâmico para garantir compatibilidade com moving_time e stravaId
+    const formattedWorkouts = workouts.map((w: any) => {
+      const dist = Number(w.distanceKm || 0);
+      const movingSecs = Number(w.moving_time_sec || (w.durationMinutes ? w.durationMinutes * 60 : 0));
+      
+      let paceFormatted = w.pace || '0:00 /km';
+      if (dist > 0 && movingSecs > 0) {
+        const paceTotalSeconds = movingSecs / dist;
+        const paceMin = Math.floor(paceTotalSeconds / 60);
+        const paceSec = Math.round(paceTotalSeconds % 60);
+        paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
+      }
+
+      return {
+        ...w,
+        stravaId: w.stravaId || w.externalId || w.id,
+        moving_time_sec: movingSecs,
+        calculatedPace: paceFormatted
+      };
+    });
+
+    return res.json(formattedWorkouts);
   } catch (error: any) {
     console.error('ERRO NO GET /:', error);
     return res.status(500).json({ error: error.message || 'Erro ao buscar treinos.' });
@@ -132,17 +154,19 @@ router.get('/', async (req, res) => {
 // POST: Cadastro manual de treino direto pelo front-end
 router.post('/', async (req, res) => {
   try {
-    const { distanceKm, durationMinutes, activityDate, type, pace, elevationMeters, title } = req.body;
+    const { distanceKm, durationMinutes, activityDate, type, pace, elevationMeters, title, stravaId, moving_time_sec } = req.body;
 
-    if (distanceKm === undefined || durationMinutes === undefined || !activityDate) {
+    if (distanceKm === undefined || (durationMinutes === undefined && moving_time_sec === undefined) || !activityDate) {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: distanceKm, durationMinutes ou activityDate.' });
     }
+
+    const durMin = moving_time_sec ? Math.round(moving_time_sec / 60) : parseInt(durationMinutes, 10);
 
     const newWorkout = await prisma.workout.create({
       data: {
         title: title || 'Treino Manual',
         distanceKm: parseFloat(distanceKm),
-        durationMinutes: parseInt(durationMinutes, 10),
+        durationMinutes: durMin,
         activityDate: new Date(activityDate),
         type: type || 'run',
         pace: pace || '00:00',
@@ -150,7 +174,7 @@ router.post('/', async (req, res) => {
       },
     });
 
-    return res.status(201).json({
+    return res.json({
       message: 'Treino cadastrado com sucesso!',
       workout: newWorkout,
     });
