@@ -5,6 +5,7 @@ import fs from 'fs';
 import { GpxService } from '../services/gpxService';
 import { TrainingPlanService } from '../services/trainingPlanService';
 import { ProgressionService } from '../services/progressionService';
+import { StravaService } from '../services/stravaService';
 
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
@@ -44,6 +45,26 @@ router.get('/training-plan', async (req, res) => {
   } catch (error: any) {
     console.error('ERRO NO GET /training-plan:', error);
     return res.status(500).json({ error: 'Erro ao gerar o plano de treino.' });
+  }
+});
+
+// GET: Retorna as voltas/tiros (laps) de uma atividade específica do Strava
+router.get('/strava/laps/:activityId', async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Token do Strava não fornecido no Header.' });
+    }
+
+    const accessToken = authHeader.replace('Bearer ', '');
+    const laps = await StravaService.getActivityLaps(accessToken, activityId);
+
+    return res.json(laps);
+  } catch (error: any) {
+    console.error(`ERRO NO GET /strava/laps/${req.params.activityId}:`, error);
+    return res.status(500).json({ error: 'Erro ao buscar voltas do Strava.' });
   }
 });
 
@@ -139,8 +160,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-export default router;
-
 // DELETE: Remove uma atividade pelo ID
 router.delete('/:id', async (req, res) => {
   try {
@@ -156,3 +175,5 @@ router.delete('/:id', async (req, res) => {
     return res.status(500).json({ error: error.message || 'Erro ao excluir atividade.' });
   }
 });
+
+export default router;

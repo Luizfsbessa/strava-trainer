@@ -22,7 +22,7 @@ function getPlannedWorkoutForDay(dateObj, plannedSessions = []) {
     
     if (foundSession) {
         return {
-            type: foundSession.sessionType.toLowerCase().includes('corrida') || foundSession.sessionType.toLowerCase().includes('longão') ? 'corrida' : 'mobilidade',
+            type: (foundSession.sessionType || '').toLowerCase().includes('corrida') || (foundSession.sessionType || '').toLowerCase().includes('longão') ? 'corrida' : 'mobilidade',
             title: foundSession.sessionType,
             targetKm: foundSession.targetDistanceKm || 0,
             targetMin: 30, // Padrão estimado ou extraído
@@ -57,16 +57,22 @@ function auditSpecificWorkout(dateString, workouts, plannedSessions = []) {
     const w = dayWorkouts[0];
     const dist = parseFloat(w.distanceKm || w.distance || w.distancia) || 0;
     
+    // PRIORIDADE: Uso do moving_time_sec (tempo ativo) para precisão da auditoria clínica
     let durationSec = 0;
-    const durMins = parseFloat(w.durationMinutes || w.duracaoMinutos) || 0;
-    if (durMins > 0) durationSec = durMins * 60;
-    else durationSec = parseFloat(w.durationSeconds || w.duration || w.timeSeconds || w.tempo) || 0;
+    if (w.moving_time_sec) {
+        durationSec = parseFloat(w.moving_time_sec);
+    } else if (w.movingTime) {
+        durationSec = parseFloat(w.movingTime);
+    } else {
+        const durMins = parseFloat(w.durationMinutes || w.duracaoMinutos) || 0;
+        if (durMins > 0) durationSec = durMins * 60;
+        else durationSec = parseFloat(w.durationSeconds || w.duration || w.timeSeconds || w.tempo) || 0;
+    }
     
     const actualMins = Math.round(durationSec / 60);
-
     const isExecutedRun = dist > 0;
 
-    // Cálculo do Pace Executado
+    // Cálculo do Pace Executado baseado no tempo em movimento
     let paceFormatted = '-';
     let calculatedPaceSec = 0;
     if (isExecutedRun && durationSec > 0) {
