@@ -38,7 +38,9 @@ export class StravaService {
 
       return {
         ...activity,
-        // Duração em minutos considerando tempo de movimento
+        stravaId: String(activity.id),
+        externalId: String(activity.id),
+        moving_time_sec: movingTimeSec,
         moving_time_min: +(movingTimeSec / 60).toFixed(1),
         moving_time_formatted: this.formatSecondsToHMS(movingTimeSec),
         calculated_pace: `${paceFormatted} /km`
