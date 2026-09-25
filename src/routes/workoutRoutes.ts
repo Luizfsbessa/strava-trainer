@@ -48,31 +48,82 @@ router.get('/training-plan', async (req, res) => {
   }
 });
 
-// GET: Busca voltas (Laps / Tiros) de uma atividade do Strava
-// GET: Busca voltas (Laps / Tiros)
+// GET: Busca voltas (Laps / Tiros) de forma dinâmica e limpa
 router.get('/strava/laps/:activityId', async (req, res) => {
   try {
     const { activityId } = req.params;
 
-    // Se o ID for o UUID do banco local ou não for numérico, gera as laps proporcionais
-    if (activityId === '04d8a3a9-0931-44a3-9803-353b1004c336' || isNaN(Number(activityId))) {
-      return res.json([
-        { lap_index: 1, distance_km: 1.0, moving_time_formatted: '06:50', pace: '6:50 /km' },
-        { lap_index: 2, distance_km: 1.0, moving_time_formatted: '06:55', pace: '6:55 /km' },
-        { lap_index: 3, distance_km: 1.0, moving_time_formatted: '06:52', pace: '6:52 /km' },
-        { lap_index: 4, distance_km: 1.0, moving_time_formatted: '07:01', pace: '7:01 /km' },
-        { lap_index: 5, distance_km: 1.0, moving_time_formatted: '06:58', pace: '6:58 /km' },
-        { lap_index: 6, distance_km: 0.87, moving_time_formatted: '06:07', pace: '7:02 /km' }
-      ]);
+    let accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.STRAVA_ACCESS_TOKEN || '';
+    
+    // Tenta buscar do Strava se for ID numérico real
+    if (!isNaN(Number(activityId))) {
+      try {
+        const laps = await StravaService.getActivityLaps(accessToken, activityId);
+        if (laps && laps.length > 0) {
+          return res.json(laps);
+        }
+      } catch (stravaErr) {
+        console.warn('Não foi possível buscar laps diretamente do Strava:', stravaErr);
+      }
     }
 
-    // Se for ID numérico real do Strava
-    let accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.STRAVA_ACCESS_TOKEN || '';
-    const laps = await StravaService.getActivityLaps(accessToken, activityId);
-    return res.json(laps);
+    // Busca o treino no banco local para o fallback dinâmico
+    const workout = await prisma.workout.findUnique({
+      where: { id: activityId }
+    });
+
+    if (!workout) {
+      return res.status(404).json({ error: 'Treino não encontrado.' });
+    }
+
+    const wAny = workout as any;
+    const totalDist = Number(workout.distanceKm || 0);
+    const totalSecs = Number(wAny.moving_time_sec || (workout.durationMinutes ? workout.durationMinutes * 60 : 0));
+
+    if (totalDist <= 0 || totalSecs <= 0) {
+      return res.json([]);
+    }
+
+    const avgPaceSecs = totalSecs / totalDist;
+    const fullKmCount = Math.floor(totalDist);
+    const remainingKm = totalDist - fullKmCount;
+    const dynamicLaps = [];
+
+    for (let i = 1; i <= fullKmCount; i++) {
+      const lapMin = Math.floor(avgPaceSecs / 60);
+      const lapSec = Math.round(avgPaceSecs % 60);
+      const formattedTime = `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`;
+
+      dynamicLaps.push({
+        lap_index: i,
+        distance_km: 1.0,
+        moving_time_formatted: formattedTime,
+        pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+      });
+    }
+
+    if (remainingKm > 0.05) {
+      const remSecs = remainingKm * avgPaceSecs;
+      const remMin = Math.floor(remSecs / 60);
+      const remSec = Math.round(remSecs % 60);
+      const formattedTime = `${remMin < 10 ? '0' : ''}${remMin}:${remSec < 10 ? '0' : ''}${remSec}`;
+
+      const paceMin = Math.floor(avgPaceSecs / 60);
+      const paceSec = Math.round(avgPaceSecs % 60);
+
+      dynamicLaps.push({
+        lap_index: fullKmCount + 1,
+        distance_km: Number(remainingKm.toFixed(2)),
+        moving_time_formatted: formattedTime,
+        pace: `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`
+      });
+    }
+
+    return res.json(dynamicLaps);
+
   } catch (error: any) {
     console.error(`ERRO NO GET /strava/laps/${req.params.activityId}:`, error);
-    return res.status(500).json({ error: 'Erro ao buscar voltas do Strava.' });
+    return res.status(500).json({ error: 'Erro ao buscar voltas.' });
   }
 });
 
@@ -121,11 +172,9 @@ router.post('/upload-gpx', upload.array('files', 50), async (req, res) => {
   }
 });
 
-
 // 2. ROTAS RAIZ
 
-// GET: Retorna o histórico de treinos com conversão forçada do registro de 24/09
-// GET: Retorna o histórico de treinos com ajuste forçado no backend
+// GET: Retorna o histórico de treinos de forma totalmente dinâmica
 router.get('/', async (req, res) => {
   try {
     const workouts = await prisma.workout.findMany({
@@ -134,13 +183,9 @@ router.get('/', async (req, res) => {
 
     const formattedWorkouts = workouts.map((w: any) => {
       const dist = Number(w.distanceKm || w.distance || 0);
-      const isTreino2409 = w.id === '04d8a3a9-0931-44a3-9803-353b1004c336' || (dist > 5.80 && dist < 5.95);
-
-      // Tempo correto: 40 minutos e 43 segundos = 2443 segundos
-      const movingSecs = isTreino2409 ? 2443 : Number(w.moving_time_sec || (w.durationMinutes ? w.durationMinutes * 60 : 0));
+      const movingSecs = Number(w.moving_time_sec || (w.durationMinutes ? w.durationMinutes * 60 : 0));
       const durationMin = movingSecs / 60;
 
-      // Recálculo do Pace: 2443s / 5.87km = 416.18s/km = 6:56 /km
       let paceFormatted = w.pace;
       if (dist > 0 && movingSecs > 0) {
         const paceTotalSeconds = movingSecs / dist;
