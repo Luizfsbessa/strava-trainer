@@ -48,14 +48,14 @@ router.get('/training-plan', async (req, res) => {
   }
 });
 
-// GET: Busca voltas (Laps / Tiros) de forma dinâmica e limpa
+// GET: Busca voltas (Laps / Tiros) estritamente de forma dinâmica
 router.get('/strava/laps/:activityId', async (req, res) => {
   try {
     const { activityId } = req.params;
 
     let accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.STRAVA_ACCESS_TOKEN || '';
     
-    // Tenta buscar do Strava se for ID numérico real
+    // Tenta buscar do Strava se for um ID numérico real
     if (!isNaN(Number(activityId))) {
       try {
         const laps = await StravaService.getActivityLaps(accessToken, activityId);
@@ -67,7 +67,7 @@ router.get('/strava/laps/:activityId', async (req, res) => {
       }
     }
 
-    // Busca o treino no banco local para o fallback dinâmico
+    // Busca o treino no banco local para gerar as voltas proporcionais ao ritmo real
     const workout = await prisma.workout.findUnique({
       where: { id: activityId }
     });
@@ -174,7 +174,7 @@ router.post('/upload-gpx', upload.array('files', 50), async (req, res) => {
 
 // 2. ROTAS RAIZ
 
-// GET: Retorna o histórico de treinos de forma totalmente dinâmica
+// GET: Retorna o histórico de treinos calculando tudo dinamicamente pelo banco
 router.get('/', async (req, res) => {
   try {
     const workouts = await prisma.workout.findMany({
@@ -241,7 +241,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE: Remove uma atividade pelo ID
+// DELETE: Remane uma atividade pelo ID
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
