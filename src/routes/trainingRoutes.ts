@@ -57,30 +57,34 @@ router.get('/plan', async (req, res) => {
       return acc + (s.targetDistanceKm || s.distanceKm || s.km || 0);
     }, 0) || 0;
 
+    // Cálculo robusto da semana atual considerando UTC para evitar perda de treinos por fuso horário
     const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const day = startOfWeek.getUTCDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - diffToMonday);
+    startOfWeek.setUTCHours(0, 0, 0, 0);
 
-    // Fim da semana atual (Domingo às 23:59:59) para evitar pegar treinos futuros ou fantasmas
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
+    endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+    endOfWeek.setUTCHours(23, 59, 59, 999);
 
     const currentWeekKm = allWorkouts
       .filter(w => {
         const wDate = new Date(w.activityDate);
-        const isInWeek = wDate >= startOfWeek && wDate <= endOfWeek;
-        console.log(`Treino: ${w.title} | Data: ${wDate.toISOString()} | Entrou na semana? ${isInWeek} | Km: ${w.distanceKm}`);
-        return isInWeek;
+        return wDate >= startOfWeek && wDate <= endOfWeek;
       })
       .reduce((acc, w) => acc + (w.distanceKm || 0), 0);
 
+    // Garante que o volume recomendado respeita o relatório de progressão real ou o histórico
+    const recommendedVolume = report.currentWeekKm > 0 
+      ? Number((report.currentWeekKm * 1.05).toFixed(2)) 
+      : (plan?.recommendedVolumeKm || totalProposedKm || 2.7);
+
     return res.json({
       strategy: plan?.strategy || report?.strategy || 'MANUTENCAO',
-      recommendedVolumeKm: plan?.recommendedVolumeKm || report?.recommendedVolumeKm || totalProposedKm || 0,
-      currentWeekKm: currentWeekKm,
+      recommendedVolumeKm: recommendedVolume,
+      currentWeekKm: Number(currentWeekKm.toFixed(2)),
       rationale: plan?.rationale || report?.rationale || 'Plano gerado automaticamente com base na progressão.',
       sessions: plan?.sessions || [],
       profile: {
