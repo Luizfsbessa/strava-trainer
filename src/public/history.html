@@ -198,15 +198,29 @@
       event.currentTarget.classList.add('active');
     }
 
-    function syncProfileCycleTitle() {
-      // Tenta recuperar o objetivo salvo no localStorage (igual ao Dashboard/Perfil)
-      const savedGoal = localStorage.getItem('trainingGoal') || localStorage.getItem('user_goal') || "Perda de Peso Progressiva (Foco em Déficit e Composição)";
+    async function syncProfileCycleTitle() {
       const titleEl = document.getElementById('cycle-main-title');
-      if (titleEl) {
-        titleEl.innerText = `🎯 Ciclo Atual: ${savedGoal}`;
+      let currentGoal = "Progresso Geral e Condicionamento";
+
+      try {
+        // Busca as configurações reais direto do banco/API
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+          const profileData = await response.json();
+          // Pega o objetivo principal que está gravado no banco de dados
+          currentGoal = profileData.trainingGoal || profileData.objective || profileData.meta || currentGoal;
+        }
+      } catch (e) {
+        console.warn('Não foi possível buscar o perfil do servidor, usando fallback local.', e);
+        // Fallback caso a API falhe momentaneamente
+        currentGoal = localStorage.getItem('trainingGoal') || localStorage.getItem('user_goal') || currentGoal;
       }
 
-      // Calcula quilometragem dos últimos 7 dias para simular o progresso da semana atual
+      if (titleEl) {
+        titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
+      }
+
+      // Calcula quilometragem dos últimos 7 dias para o progresso semanal
       let totalKmWeek = 0;
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
