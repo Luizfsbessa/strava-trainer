@@ -120,7 +120,7 @@
       <button class="history-tab-btn" onclick="switchHistoryTab('cycles', event)">📈 Linha do Tempo de Ciclos</button>
     </div>
 
-    <!-- Aba 1: Calendário e Atividades (Conteúdo Original) -->
+    <!-- Aba 1: Calendário e Atividades -->
     <div id="pane-activities" class="tab-pane active">
       <div class="calendar-card">
         <div class="calendar-header">
@@ -137,23 +137,23 @@
       <div id="history-container">Buscando dados do banco...</div>
     </div>
 
-    <!-- Aba 2: Linha do Tempo de Ciclos (Novo) -->
+    <!-- Aba 2: Linha do Tempo de Ciclos (Dinâmica baseada no perfil) -->
     <div id="pane-cycles" class="tab-pane">
       <div class="cycle-block">
         <div class="cycle-title">
-          <span>🎯 Ciclo Atual: Maratona / Longão Estendido</span>
+          <span id="cycle-main-title">🎯 Ciclo Atual: Sincronizando objetivo...</span>
           <span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>
         </div>
-        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Acompanhamento do progresso semanal por blocos de objetivo.</p>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Acompanhamento do progresso semanal baseado na sua diretriz de treinamento atual.</p>
         
         <div class="week-item">
           <div>
-            <strong style="color: var(--text-main);">Semana 1: Base e Construção</strong>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Foco: Aeróbico constante e adaptação</div>
+            <strong style="color: var(--text-main);">Semana Atual: Bloco Ativo</strong>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Foco configurado no perfil do atleta</div>
           </div>
           <div style="display: flex; gap: 20px; font-size: 13px;">
-            <span>Alvo: <strong>35.43 km</strong></span>
-            <span>Realizado: <strong style="color: var(--accent-blue);">0.0 km</strong></span>
+            <span>Alvo Base: <strong>30.0 km</strong></span>
+            <span>Realizado: <strong id="cycle-realized-km" style="color: var(--accent-blue);">0.0 km</strong></span>
             <span style="color: var(--accent-gold);">Em Andamento</span>
           </div>
         </div>
@@ -162,7 +162,7 @@
       <!-- Exemplo de Ciclo Anterior Arquivado -->
       <div class="cycle-block" style="opacity: 0.8;">
         <div class="cycle-title" style="color: var(--text-muted);">
-          <span>🏁 Ciclo Anterior: Perda de Peso / Base Inicial</span>
+          <span>🏁 Ciclo Anterior: Base Inicial e Adaptação</span>
           <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px;">Concluído</span>
         </div>
         <div class="week-item">
@@ -170,8 +170,8 @@
             <strong style="color: var(--text-main);">Semana 1: Adaptação Inicial</strong>
           </div>
           <div style="display: flex; gap: 20px; font-size: 13px;">
-            <span>Alvo: <strong>28.0 km</strong></span>
-            <span>Realizado: <strong style="color: var(--accent-blue);">29.5 km</strong></span>
+            <span>Alvo: <strong>25.0 km</strong></span>
+            <span>Realizado: <strong style="color: var(--accent-blue);">26.5 km</strong></span>
             <span style="color: var(--accent-blue);">Concluído</span>
           </div>
         </div>
@@ -193,8 +193,38 @@
         document.getElementById('pane-activities').classList.add('active');
       } else if (tabName === 'cycles') {
         document.getElementById('pane-cycles').classList.add('active');
+        syncProfileCycleTitle();
       }
       event.currentTarget.classList.add('active');
+    }
+
+    function syncProfileCycleTitle() {
+      // Tenta recuperar o objetivo salvo no localStorage (igual ao Dashboard/Perfil)
+      const savedGoal = localStorage.getItem('trainingGoal') || localStorage.getItem('user_goal') || "Perda de Peso Progressiva (Foco em Déficit e Composição)";
+      const titleEl = document.getElementById('cycle-main-title');
+      if (titleEl) {
+        titleEl.innerText = `🎯 Ciclo Atual: ${savedGoal}`;
+      }
+
+      // Calcula quilometragem dos últimos 7 dias para simular o progresso da semana atual
+      let totalKmWeek = 0;
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+
+      globalWorkouts.forEach(w => {
+        const rawDate = w.activityDate || w.date;
+        if (rawDate) {
+          const wDate = new Date(rawDate);
+          if (wDate >= oneWeekAgo && wDate <= now) {
+            totalKmWeek += Number(w.distanceKm || w.distance || 0);
+          }
+        }
+      });
+
+      const realizedEl = document.getElementById('cycle-realized-km');
+      if (realizedEl) {
+        realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
+      }
     }
 
     async function loadHistory() {
@@ -218,6 +248,7 @@
         calculatePersonalRecords(globalWorkouts);
         renderCalendar(globalWorkouts);
         renderWorkoutsList(globalWorkouts);
+        syncProfileCycleTitle();
       } catch (err) {
         console.error('Erro ao carregar histórico:', err);
         container.innerHTML = `<div class="empty-state">Erro ao conectar com o banco de dados.</div>`;
