@@ -365,7 +365,7 @@
         document.getElementById('m-cycle-phase').innerText = cycleWeekName;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}. <br><span style="font-size: 11px; color: var(--text-muted); display:inline-block; margin-top:4px;">💡 Quer alterar sua meta ou peso? Ajuste na aba <a href="profile.html" style="color: var(--accent-blue);">Meu Perfil</a>.</span>`;
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
 
         const sessionsContainer = document.getElementById('sessions-container');
         
@@ -385,7 +385,7 @@
           }
           return `
             <div class="card">
-              <div class="day">${s.dayOfWeek} (Proposto vs Executado)</div>
+              <div class="day">${s.dayOfWeek} </div>
               <div class="type">
                 <span>${s.sessionType}</span>
                 <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
