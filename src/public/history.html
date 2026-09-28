@@ -203,24 +203,23 @@
       let currentGoal = "Progresso Geral e Condicionamento";
 
       try {
-        // Busca as configurações reais direto do banco/API
         const response = await fetch('/api/profile');
         if (response.ok) {
           const profileData = await response.json();
-          // Pega o objetivo principal que está gravado no banco de dados
-          currentGoal = profileData.trainingGoal || profileData.objective || profileData.meta || currentGoal;
+          console.log("Dados do Perfil recebidos da API:", profileData); // Ajuda a inspecionar no F12 se necessário
+          
+          // Varre todas as chaves possíveis que o backend pode usar para o objetivo
+          currentGoal = profileData.trainingGoal || profileData.objective || profileData.meta || profileData.goal || profileData.target || currentGoal;
         }
       } catch (e) {
-        console.warn('Não foi possível buscar o perfil do servidor, usando fallback local.', e);
-        // Fallback caso a API falhe momentaneamente
-        currentGoal = localStorage.getItem('trainingGoal') || localStorage.getItem('user_goal') || currentGoal;
+        console.warn('Erro ao buscar perfil do servidor:', e);
       }
 
       if (titleEl) {
         titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
       }
 
-      // Calcula quilometragem dos últimos 7 dias para o progresso semanal
+      // Cálculo da quilometragem dos últimos 7 dias para o progresso semanal
       let totalKmWeek = 0;
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
