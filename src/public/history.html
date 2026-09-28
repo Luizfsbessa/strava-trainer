@@ -18,12 +18,21 @@
     }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 30px; }
     .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; box-sizing: border-box; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
     h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; }
     .nav-links { display: flex; gap: 12px; }
     .nav-links a { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
     .nav-links a:hover { border-color: var(--accent-blue); }
     
+    /* Abas Internas da Página de Histórico */
+    .history-tabs { display: flex; gap: 10px; margin-bottom: 25px; }
+    .history-tab-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .history-tab-btn:hover { border-color: var(--accent-blue); color: var(--text-main); }
+    .history-tab-btn.active { background: var(--accent-blue); color: #000; border-color: var(--accent-blue); font-weight: bold; }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
     .calendar-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .calendar-title-area { display: flex; align-items: center; gap: 12px; }
@@ -44,7 +53,6 @@
       background: rgba(255, 255, 255, 0.02) !important;
       border: 1px dashed rgba(255, 255, 255, 0.08) !important;
     }
-
     .calendar-grid .cal-cell:not(:has(img)) .cal-date {
       color: #475569 !important;
       opacity: 0.5;
@@ -84,6 +92,11 @@
     .view-toggle-btn.active { background: var(--accent-blue); color: #000; font-weight: bold; border-color: var(--accent-blue); }
     
     .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); }
+
+    /* Estilos para a Linha do Tempo de Ciclos */
+    .cycle-block { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .cycle-title { font-size: 18px; color: var(--accent-blue); font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .week-item { background: #070a12; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
   </style>
 </head>
 <body>
@@ -101,25 +114,88 @@
       </div>
     </header>
 
-    <div class="calendar-card">
-      <div class="calendar-header">
-        <div class="calendar-title-area">
-          <button class="cal-nav-btn" onclick="changeMonth(-1)">❮</button>
-          <h3 id="cal-month-title">Carregando...</h3>
-          <button class="cal-nav-btn" onclick="changeMonth(1)">❯</button>
-        </div>
-        <div style="font-size: 12px; color: var(--text-muted);">Clique no dia para filtrar o treino</div>
-      </div>
-      <div class="calendar-grid" id="calendar-days-grid"></div>
+    <!-- Seletor de Abas Internas -->
+    <div class="history-tabs">
+      <button class="history-tab-btn active" onclick="switchHistoryTab('activities', event)">📅 Calendário e Atividades</button>
+      <button class="history-tab-btn" onclick="switchHistoryTab('cycles', event)">📈 Linha do Tempo de Ciclos</button>
     </div>
 
-    <div id="history-container">Buscando dados do banco...</div>
+    <!-- Aba 1: Calendário e Atividades (Conteúdo Original) -->
+    <div id="pane-activities" class="tab-pane active">
+      <div class="calendar-card">
+        <div class="calendar-header">
+          <div class="calendar-title-area">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)">❮</button>
+            <h3 id="cal-month-title">Carregando...</h3>
+            <button class="cal-nav-btn" onclick="changeMonth(1)">❯</button>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted);">Clique no dia para filtrar o treino</div>
+        </div>
+        <div class="calendar-grid" id="calendar-days-grid"></div>
+      </div>
+
+      <div id="history-container">Buscando dados do banco...</div>
+    </div>
+
+    <!-- Aba 2: Linha do Tempo de Ciclos (Novo) -->
+    <div id="pane-cycles" class="tab-pane">
+      <div class="cycle-block">
+        <div class="cycle-title">
+          <span>🎯 Ciclo Atual: Maratona / Longão Estendido</span>
+          <span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Acompanhamento do progresso semanal por blocos de objetivo.</p>
+        
+        <div class="week-item">
+          <div>
+            <strong style="color: var(--text-main);">Semana 1: Base e Construção</strong>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Foco: Aeróbico constante e adaptação</div>
+          </div>
+          <div style="display: flex; gap: 20px; font-size: 13px;">
+            <span>Alvo: <strong>35.43 km</strong></span>
+            <span>Realizado: <strong style="color: var(--accent-blue);">0.0 km</strong></span>
+            <span style="color: var(--accent-gold);">Em Andamento</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exemplo de Ciclo Anterior Arquivado -->
+      <div class="cycle-block" style="opacity: 0.8;">
+        <div class="cycle-title" style="color: var(--text-muted);">
+          <span>🏁 Ciclo Anterior: Perda de Peso / Base Inicial</span>
+          <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px;">Concluído</span>
+        </div>
+        <div class="week-item">
+          <div>
+            <strong style="color: var(--text-main);">Semana 1: Adaptação Inicial</strong>
+          </div>
+          <div style="display: flex; gap: 20px; font-size: 13px;">
+            <span>Alvo: <strong>28.0 km</strong></span>
+            <span>Realizado: <strong style="color: var(--accent-blue);">29.5 km</strong></span>
+            <span style="color: var(--accent-blue);">Concluído</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     let globalWorkouts = [];
     let currentDisplayDate = new Date();
     let prRecords = {};
+
+    function switchHistoryTab(tabName, event) {
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+
+      if (tabName === 'activities') {
+        document.getElementById('pane-activities').classList.add('active');
+      } else if (tabName === 'cycles') {
+        document.getElementById('pane-cycles').classList.add('active');
+      }
+      event.currentTarget.classList.add('active');
+    }
 
     async function loadHistory() {
       const container = document.getElementById('history-container');
