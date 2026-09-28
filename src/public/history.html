@@ -200,29 +200,28 @@
 
     async function syncProfileCycleTitle() {
       const titleEl = document.getElementById('cycle-main-title');
-      let currentGoal = "Progresso Geral e Condicionamento";
+      let currentGoal = "Não encontrado";
 
       try {
-        // Usa a rota correta '/status' que o seu dashboard já consome com sucesso
         const response = await fetch('/status');
         if (response.ok) {
           const statusData = await response.json();
-          console.log("Dados de status recebidos da API:", statusData);
+          console.log("CONTEÚDO COMPLETO DE /STATUS:", statusData);
           
-          // Pega o objetivo de treino de dentro do objeto de status/perfil retornado
+          // Se o objetivo vier dentro de algum objeto ou propriedade específica, vamos testar pegar direto:
+          // Altere aqui se o console mostrar o campo com outro nome (ex: statusData.goal)
           currentGoal = statusData.trainingGoal || 
                         statusData.objective || 
                         statusData.goal || 
                         statusData.meta || 
                         statusData.target || 
-                        currentGoal;
+                        JSON.stringify(statusData); // Se não achar nenhuma chave, mostra o JSON inteiro na tela para vermos
         }
       } catch (e) {
-        console.warn('Erro ao buscar status do servidor:', e);
+        currentGoal = "Erro ao buscar /status";
       }
 
       if (titleEl) {
-        // Formata bonitinho mantendo o padrão visual
         titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
       }
 
