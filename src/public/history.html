@@ -200,25 +200,26 @@
 
     async function syncProfileCycleTitle() {
       const titleEl = document.getElementById('cycle-main-title');
-      let currentGoal = "Não encontrado";
+      let currentGoal = "Progresso Geral e Condicionamento";
 
       try {
-        const response = await fetch('/status');
+        // Usa a rota correta '/init' que o sistema utiliza para inicializar os dados
+        const response = await fetch('/init');
         if (response.ok) {
-          const statusData = await response.json();
-          console.log("CONTEÚDO COMPLETO DE /STATUS:", statusData);
+          const initData = await response.json();
+          console.log("Dados de inicialização recebidos:", initData);
           
-          // Se o objetivo vier dentro de algum objeto ou propriedade específica, vamos testar pegar direto:
-          // Altere aqui se o console mostrar o campo com outro nome (ex: statusData.goal)
-          currentGoal = statusData.trainingGoal || 
-                        statusData.objective || 
-                        statusData.goal || 
-                        statusData.meta || 
-                        statusData.target || 
-                        JSON.stringify(statusData); // Se não achar nenhuma chave, mostra o JSON inteiro na tela para vermos
+          // Pega o objetivo de treino do objeto retornado (ajustando para a estrutura do init)
+          const athlete = initData.profile || initData.user || initData;
+          currentGoal = athlete.trainingGoal || 
+                        athlete.training_goal || 
+                        athlete.objective || 
+                        athlete.goal || 
+                        athlete.meta || 
+                        currentGoal;
         }
       } catch (e) {
-        currentGoal = "Erro ao buscar /status";
+        console.warn('Erro ao buscar dados do servidor:', e);
       }
 
       if (titleEl) {
