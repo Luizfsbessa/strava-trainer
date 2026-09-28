@@ -273,7 +273,10 @@
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         const rawProfile = data.profile || {};
-        const currentWeightNum = parseFloat(String(rawProfile.currentWeight || rawProfile.weight || 101.6).replace(',', '.'));
+        
+        // Prioriza o peso atualizado salvo no localStorage ou profile do backend
+        const storedWeight = localStorage.getItem('user_current_weight');
+        const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
 
         const profile = {
@@ -291,6 +294,8 @@
         const now = new Date();
         const dayOfWeek = now.getDay();
         const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        
+        // Semana Atual (Segunda a Domingo)
         const startOfCurrentWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
         startOfCurrentWeek.setHours(0, 0, 0, 0);
 
@@ -298,11 +303,14 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
+        // Semana Anterior CORRIGIDA (Termina no domingo anterior, com duração completa de 7 dias)
         const startOfPreviousWeek = new Date(startOfCurrentWeek);
         startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
+        startOfPreviousWeek.setHours(0, 0, 0, 0);
         
-        const endOfPreviousWeek = new Date(endOfCurrentWeek);
-        endOfPreviousWeek.setDate(endOfPreviousWeek.getDate() - 7);
+        const endOfPreviousWeek = new Date(startOfCurrentWeek);
+        endOfPreviousWeek.setDate(endOfPreviousWeek.getDate() - 1);
+        endOfPreviousWeek.setHours(23, 59, 59, 999);
 
         const previousWeekKm = workouts
           .filter(w => {
@@ -320,7 +328,8 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        const dynamicTargetKm = previousWeekKm * multiplier;
+        // Se houver volume na semana passada, usa o multiplicador dinâmico; senão, usa o alvo base do objetivo
+        const dynamicTargetKm = previousWeekKm > 0 ? (previousWeekKm * multiplier) : (objectiveConfig.targetVolume || 23.33);
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
@@ -338,7 +347,7 @@
         document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
         document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
         document.getElementById('m-objective').innerText = objectiveCustomText;
-        document.getElementById('m-weight').innerHTML = `${profile.currentWeight}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
+        document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
         document.getElementById('rationale-box').innerHTML = objectiveConfig.rationale;
 
@@ -350,16 +359,14 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            const totalVol = parseFloat(document.getElementById('weeklyTargetVol')?.innerText || objectiveConfig.targetVolume || 23.33);
-            
             let calculatedDist = s.suggestedDist;
-            if (totalVol) {
+            if (dynamicTargetKm) {
               if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
-                calculatedDist = `${(totalVol * 0.45).toFixed(1)} km`;
+                calculatedDist = `${(dynamicTargetKm * 0.45).toFixed(1)} km`;
               } else if (s.sessionType && (s.sessionType.includes('Intervalado') || s.sessionType.includes('Tiros'))) {
-                calculatedDist = `${(totalVol * 0.25).toFixed(1)} km`;
+                calculatedDist = `${(dynamicTargetKm * 0.25).toFixed(1)} km`;
               } else {
-                calculatedDist = `${(totalVol * 0.30).toFixed(1)} km`;
+                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
               }
             }
 
@@ -435,6 +442,7 @@
       if (objective === "5km") {
         return {
           multiplier: 1.05,
+          targetVolume: 22.0,
           text: "Meta: 5 km (Velocidade)",
           rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
           sessions: [
@@ -450,6 +458,7 @@
       } else {
         return {
           multiplier: 1.08,
+          targetVolume: 24.4,
           text: "Perda de Peso Progressiva",
           rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).",
           sessions: [
