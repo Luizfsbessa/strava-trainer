@@ -28,7 +28,10 @@ export class TrainingPlanService {
     report: WeeklyProgressionReport,
     userPaceSettings?: UserPaceSettings
   ): NextWeekPlan {
-    let targetVolume = report.currentWeekKm;
+    // CORREÇÃO: Se o volume da semana atual for 0 (início de semana), usa a semana passada como base de cálculo
+    const baseVolumeForCalc = report.currentWeekKm > 0 ? report.currentWeekKm : (report.previousWeekKm > 0 ? report.previousWeekKm : 24.4);
+    
+    let targetVolume = baseVolumeForCalc;
     let strategy: NextWeekPlan['strategy'] = 'MANUTENCAO';
     let rationale = '';
 
@@ -44,16 +47,16 @@ export class TrainingPlanService {
     // 1. Definição da Estratégia
     if (report.status === 'ALERTA_OVERTRAINING' || report.acwrRatio > 1.4) {
       strategy = 'REGENERACAO_FORCADA';
-      targetVolume = Number((report.currentWeekKm * 0.75).toFixed(2));
+      targetVolume = Number((baseVolumeForCalc * 0.75).toFixed(2));
       rationale = 'Sua carga recente está elevada (risco de fadiga/lesão). A próxima semana será de regeneração para permitir supercompensação.';
     } else if (report.status === 'ATENCAO_VOLUME') {
       strategy = 'MANUTENCAO';
-      targetVolume = Number((report.currentWeekKm * 1.0).toFixed(2));
+      targetVolume = Number((baseVolumeForCalc * 1.0).toFixed(2));
       rationale = 'O volume da última semana subiu rápido. Recomendamos consolidar essa quilometragem sem aumentos por enquanto.';
     } else {
       strategy = 'AUMENTO_GRADUAL';
-      targetVolume = Number((report.currentWeekKm * 1.08).toFixed(2));
-      rationale = 'Sua relação de carga (ACWR) está na Zona Doce. Aumentaremos o volume em ~8% para manter a evolução aeróbica.';
+      targetVolume = Number((baseVolumeForCalc * 1.08).toFixed(2));
+      rationale = 'Sua relação de carga (ACWR) está na Zona Doce. Aumentaremos o volume em ~8% para manter a evolução aeróbica e a perda de peso.';
     }
 
     // 2. Divisão do Volume Semanal
