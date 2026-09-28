@@ -177,7 +177,7 @@
       try {
         const res = await fetch('/api/user/weight-history');
         if (!res.ok) throw new Error('Falha ao buscar histórico');
-        const history = await res.json();
+        let history = await res.json();
 
         const chartContainer = document.getElementById('chartContainer');
         const noDataMsg = document.getElementById('noDataMsg');
@@ -191,8 +191,17 @@
         chartContainer.style.display = 'block';
         noDataMsg.style.display = 'none';
 
-        const labels = history.map(item => new Date(item.date).toLocaleDateString('pt-BR'));
-        const weights = history.map(item => item.weight);
+        // Evita múltiplos registros do mesmo dia unificando pela data formatada (DD/MM/AAAA)
+        const groupedData = {};
+        history.forEach(item => {
+          if (!item.date) return;
+          const dateKey = new Date(item.date).toLocaleDateString('pt-BR');
+          // Mantém sempre o último registro ou o peso atualizado daquele dia
+          groupedData[dateKey] = item.weight;
+        });
+
+        const labels = Object.keys(groupedData);
+        const weights = Object.values(groupedData);
 
         const ctx = document.getElementById('weightChart').getContext('2d');
         if (weightChartInstance) {
@@ -284,8 +293,13 @@
       const birthDateVal = document.getElementById('pBirthDate').value;
       const weightVal = parseFloat(document.getElementById('pWeight').value);
       const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
-      const objectiveVal = document.getElementById('pObjective').value;
+      const objectiveSelect = document.getElementById('pObjective');
+      const objectiveVal = objectiveSelect.value;
+      const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
       const ageVal = calculateAge(birthDateVal);
+
+      // Salva explicitamente no localStorage para o Dashboard puxar o texto formatado e a chave
+      localStorage.setItem('user_objective', objectiveText);
 
       const saved = localStorage.getItem('strava_trainer_state');
       let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
@@ -296,6 +310,7 @@
       data.profile.currentWeight = weightVal;
       data.profile.targetWeight = targetWeightVal;
       data.profile.objective = objectiveVal;
+      data.profile.objectiveText = objectiveText;
       localStorage.setItem('strava_trainer_state', JSON.stringify(data));
 
       try {
