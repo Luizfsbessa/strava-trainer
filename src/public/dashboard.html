@@ -168,16 +168,8 @@
         <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Objetivo Atual</div>
-        <!-- Selector rápido de objetivo direto no card para evitar travar -->
-        <div style="margin-top: 6px;">
-          <select id="quickObjectiveSelect" onchange="changeObjectiveQuickly(this.value)" style="padding: 6px 10px; font-size: 12px; font-weight: 700; color: var(--accent-green); background: #060911; border-color: var(--border-color);">
-            <option value="perda_peso">Perda de Peso Progressiva</option>
-            <option value="5km">Meta: 5 km (Velocidade)</option>
-            <option value="10km">Meta: 10 km (Resistência)</option>
-            <option value="maratona">Meta: Maratona / Longão</option>
-          </select>
-        </div>
+        <div class="metric-label">Objetivo Configurado (Perfil)</div>
+        <div class="metric-value" id="m-objective-label" style="font-size: 14px; margin-top: 6px; color: var(--accent-green); font-weight: 700;">-</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Peso / Projeção Meta</div>
@@ -270,11 +262,6 @@
   <script>
     document.getElementById('activityDate').valueAsDate = new Date();
 
-    function changeObjectiveQuickly(newObj) {
-      localStorage.setItem('user_objective', newObj);
-      loadDashboard();
-    }
-
     async function loadDashboard() {
       try {
         const response = await fetch('/api/workouts');
@@ -284,15 +271,13 @@
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         const rawProfile = data.profile || {};
         
+        // Sincroniza e puxa parâmetros direto do perfil cadastrado (salvo no profile.html ou backend)
         const storedWeight = localStorage.getItem('user_current_weight');
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
 
+        // Puxa o objetivo diretamente do perfil unificado
         const savedObjective = localStorage.getItem('user_objective') || rawProfile.objective || rawProfile.trainingObjective || "perda_peso";
-        
-        // Atualiza o select rápido para refletir o estado correto
-        const objSelectElem = document.getElementById('quickObjectiveSelect');
-        if (objSelectElem) objSelectElem.value = savedObjective;
 
         const profile = {
           age: rawProfile.age || 39,
@@ -300,6 +285,15 @@
           targetWeight: targetWeightNum,
           objective: savedObjective
         };
+
+        // Descrição amigável para o card de objetivo baseado no perfil
+        let objectiveReadableName = "Perda de Peso Progressiva";
+        const objLower = String(profile.objective).toLowerCase();
+        if (objLower.includes("5km")) objectiveReadableName = "Meta: 5 km (Velocidade)";
+        else if (objLower.includes("10km")) objectiveReadableName = "Meta: 10 km (Resistência)";
+        else if (objLower.includes("maratona")) objectiveReadableName = "Meta: Maratona / Longão";
+
+        document.getElementById('m-objective-label').innerText = objectiveReadableName;
 
         const now = new Date();
         now.setHours(0, 0, 0, 0);
@@ -393,7 +387,7 @@
         document.getElementById('m-cycle-phase').innerText = cycleWeekName;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}. <br><span style="font-size: 11px; color: var(--text-muted); display:inline-block; margin-top:4px;">💡 Quer alterar sua meta ou peso? Ajuste na aba <a href="profile.html" style="color: var(--accent-blue);">Meu Perfil</a>.</span>`;
 
         const sessionsContainer = document.getElementById('sessions-container');
         sessionsContainer.innerHTML = objectiveConfig.sessions.map(s => {
