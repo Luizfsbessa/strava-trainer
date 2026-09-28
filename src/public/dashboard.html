@@ -147,33 +147,33 @@
     <header>
       <div>
         <h1>Planejador de Treinos</h1>
-        <div class="subtitle" id="subtitle-info">Carregando perfil...</div>
+        <div class="subtitle" id="subtitle-info">Carregando perfil...[cite: 12]</div>
       </div>
       <div class="nav-links">
-        <a href="dashboard.html" class="active">Dashboard</a>
-        <a href="profile.html">Meu Perfil</a>
-        <a href="history.html">Histórico</a>
-        <a href="analytics.html">Análise</a>
+        <a href="dashboard.html" class="active">Dashboard[cite: 12]</a>
+        <a href="profile.html">Meu Perfil[cite: 12]</a>
+        <a href="history.html">Histórico[cite: 12]</a>
+        <a href="analytics.html">Análise[cite: 12]</a>
       </div>
     </header>
 
     <div class="metrics-grid">
       <div class="metric-card">
-        <div class="metric-label">Rodado na Semana</div>
-        <div class="metric-value highlight" id="m-week-km">0.0 km</div>
+        <div class="metric-label">Rodado na Semana[cite: 12]</div>
+        <div class="metric-value highlight" id="m-week-km">0.0 km[cite: 12]</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Volume Alvo (Dinâmico)</div>
-        <div class="metric-value" id="m-target-km">0.0 km</div>
-        <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
+        <div class="metric-label">Volume Alvo (Dinâmico)[cite: 12]</div>
+        <div class="metric-value" id="m-target-km">0.0 km[cite: 12]</div>
+        <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-[cite: 12]</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Objetivo Atual</div>
-        <div class="metric-value" id="m-objective" style="font-size: 13px; margin-top: 4px; color: var(--accent-green);">-</div>
+        <div class="metric-label">Objetivo Atual[cite: 12]</div>
+        <div class="metric-value" id="m-objective" style="font-size: 13px; margin-top: 4px; color: var(--accent-green);">-[cite: 12]</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Peso / Projeção Meta</div>
-        <div class="metric-value" id="m-weight" style="font-size: 14px; margin-top: 4px; color: var(--accent-blue);">-</div>
+        <div class="metric-label">Peso / Projeção Meta[cite: 12]</div>
+        <div class="metric-value" id="m-weight" style="font-size: 14px; margin-top: 4px; color: var(--accent-blue);">-[cite: 12]</div>
       </div>
     </div>
 
@@ -182,14 +182,14 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span id="userLevelBadge" style="background: #38bdf8; color: #090d16; font-weight: 900; font-size: 12px; padding: 4px 10px; border-radius: 20px;">
-            NÍVEL 1
+            NÍVEL 1[cite: 12]
           </span>
           <span id="userLevelTitle" style="font-weight: 700; font-size: 15px; color: #f8fafc;">
-            Atleta em Evolução
+            Atleta em Evolução[cite: 12]
           </span>
         </div>
         <div style="font-size: 13px; color: #94a3b8; font-weight: 600;">
-          <span id="currentXpText">0</span> / <span id="nextLevelXpText">500</span> XP
+          <span id="currentXpText">0</span> / <span id="nextLevelXpText">500</span> XP[cite: 12]
         </div>
       </div>
       <!-- Barra de Progresso XP -->
@@ -200,59 +200,59 @@
 
     <div class="main-layout">
       <div>
-        <div class="section-title">📅 Matriz Modulada com Sugestão de Pace, Carga & Preview Dinâmico</div>
+        <div class="section-title">📅 Matriz Modulada com Sugestão de Pace, Carga & Preview Dinâmico[cite: 12]</div>
         <div class="rationale-box" id="rationale-box">
-          Carregando diretrizes do algoritmo...
+          Carregando diretrizes do algoritmo...[cite: 12]
         </div>
         <div id="sessions-container"></div>
       </div>
 
       <div>
         <div class="sidebar-panel">
-          <div class="section-title" style="font-size: 14px;">⚡ Importar do Strava (GPX)</div>
+          <div class="section-title" style="font-size: 14px;">⚡ Importar do Strava (GPX)[cite: 12]</div>
           <form id="gpx-form" onsubmit="uploadGpx(event)">
             <div class="form-group">
               <input type="file" id="gpxFiles" accept=".gpx" multiple required style="padding: 8px; font-size: 11px; cursor: pointer;">
             </div>
-            <button type="submit" class="btn btn-strava">Importar Arquivo(s) GPX</button>
+            <button type="submit" class="btn btn-strava">Importar Arquivo(s) GPX[cite: 12]</button>
           </form>
 
           <hr class="divider">
 
-          <div class="section-title" style="font-size: 14px;">✍️ Lançamento Manual</div>
+          <div class="section-title" style="font-size: 14px;">✍️ Lançamento Manual[cite: 12]</div>
           <form id="workout-form" onsubmit="submitWorkout(event)">
             <div class="form-group">
-              <label>Tipo de Atividade</label>
+              <label>Tipo de Atividade[cite: 12]</label>
               <select id="workoutType" onchange="toggleManualFields()">
-                <option value="corrida">🏃‍♂️ Corrida</option>
-                <option value="mobilidade">🧘‍♂️ Mobilidade</option>
-                <option value="educativo">⚡ Educativos</option>
+                <option value="corrida">🏃‍♂️ Corrida[cite: 12]</option>
+                <option value="mobilidade">🧘‍♂️ Mobilidade[cite: 12]</option>
+                <option value="educativo">⚡ Educativos[cite: 12]</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Título / Descrição</label>
+              <label>Título / Descrição[cite: 12]</label>
               <input type="text" id="title" placeholder="Ex: Alongamento de quadril" required>
             </div>
             <div class="form-group" id="field-distance">
-              <label>Distância (km)</label>
+              <label>Distância (km)[cite: 12]</label>
               <input type="number" step="0.1" id="distanceKm" value="0.0" placeholder="0.0">
             </div>
             <div class="form-group">
-              <label>Duração (minutos)</label>
+              <label>Duração (minutos)[cite: 12]</label>
               <input type="number" id="durationMinutes" placeholder="0" required>
             </div>
             <div class="form-group">
-              <label>Data do Treino</label>
+              <label>Data do Treino[cite: 12]</label>
               <input type="date" id="activityDate" required>
             </div>
-            <button type="submit" class="btn">Salvar Atividade</button>
+            <button type="submit" class="btn">Salvar Atividade[cite: 12]</button>
           </form>
 
           <hr class="divider">
 
           <!-- PAINEL DE BADGES EVOLUTIVAS -->
           <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span>🏆 Conquistas & Evolução</span>
+            <span>🏆 Conquistas & Evolução[cite: 12]</span>
           </div>
           <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
 
@@ -267,7 +267,7 @@
     async function loadDashboard() {
       try {
         const response = await fetch('/api/workouts');
-        if (!response.ok) throw new Error('Erro ao carregar dados do servidor');
+        if (!response.ok) throw new Error('Erro ao carregar dados do servidor[cite: 12]');
         const data = await response.json();
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
@@ -277,7 +277,6 @@
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
 
-        // CORREÇÃO DO BUG: Lê o objetivo salvo no perfil (localStorage ou backend) de forma dinâmica
         const savedObjective = localStorage.getItem('user_objective') || rawProfile.objective || rawProfile.trainingObjective || "perda_peso";
 
         const profile = {
@@ -301,7 +300,6 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // Rodagem real da semana atual
         const currentWeekKm = workouts
           .filter(w => {
             const isRun = (!w.type || w.type === 'corrida');
@@ -342,48 +340,46 @@
         switch (cycleWeekNumber) {
           case 1:
             cycleMultiplier = 1.05;
-            cycleWeekName = 'Semana 1: Base e Construção';
+            cycleWeekName = 'Semana 1: Base e Construção[cite: 12]';
             break;
           case 2:
             cycleMultiplier = 1.05;
-            cycleWeekName = 'Semana 2: Ritmo e Densidade';
+            cycleWeekName = 'Semana 2: Ritmo e Densidade[cite: 12]';
             break;
           case 3:
             cycleMultiplier = 1.05;
-            cycleWeekName = 'Semana 3: Pico de Carga';
+            cycleWeekName = 'Semana 3: Pico de Carga[cite: 12]';
             break;
           case 4:
             cycleMultiplier = 0.85;
-            cycleWeekName = 'Semana 4: Deload / Regenerativa';
+            cycleWeekName = 'Semana 4: Deload / Regenerativa[cite: 12]';
             break;
         }
 
         const dynamicTargetKm = baseVolForProgression * cycleMultiplier;
         
-        // Passa o objetivo atual para a matriz ajustar o painel e os treinos
         const objectiveConfig = getObjectiveMatrix(profile.objective, dynamicTargetKm);
-
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
-        let projectionText = "Meta Atingida! 🎉";
+        let projectionText = "Meta Atingida! 🎉[cite: 12]";
         
         if (weightDiff > 0) {
           const weeklyLossRate = 0.6; 
           const estimatedWeeks = Math.ceil(weightDiff / weeklyLossRate);
-          projectionText = `Faltam ${weightDiff.toFixed(1)}kg (~${estimatedWeeks} semanas)`;
+          projectionText = `Faltam ${weightDiff.toFixed(1)}kg (~${estimatedWeeks} semanas)[cite: 12]`;
         } else if (weightDiff < 0) {
-          projectionText = `Foco em ganho/manutenção`;
+          projectionText = `Foco em ganho/manutenção[cite: 12]`;
         }
 
-        document.getElementById('subtitle-info').innerText = `Perfil Ativo (Idade: ${profile.age} anos) | Pace Base Calculado: ${formatPace(basePaceSecs)} /km`;
-        document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
-        document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
+        document.getElementById('subtitle-info').innerText = `Perfil Ativo (Idade: ${profile.age} anos) | Pace Base Calculado: ${formatPace(basePaceSecs)} /km[cite: 12]`;
+        document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km[cite: 12]`;
+        document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km[cite: 12]`;
         document.getElementById('m-cycle-phase').innerText = cycleWeekName;
         document.getElementById('m-objective').innerText = objectiveConfig.text;
-        document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
+        document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>[cite: 12]`;
         
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.[cite: 12]`;
 
         const sessionsContainer = document.getElementById('sessions-container');
         sessionsContainer.innerHTML = objectiveConfig.sessions.map(s => {
@@ -400,16 +396,16 @@
           }
           return `
             <div class="card">
-              <div class="day">${s.dayOfWeek} (Proposto vs Executado)</div>
+              <div class="day">${s.dayOfWeek} (Proposto vs Executado)[cite: 12]</div>
               <div class="type">
-                <span>${s.sessionType}</span>
-                <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
+                <span>${s.sessionType}[cite: 12]</span>
+                <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}[cite: 12]</span>
               </div>
-              <div class="desc">${s.description}</div>
+              <div class="desc">${s.description}[cite: 12]</div>
               <div class="workout-details">
                 ${detailsHtml}
               </div>
-              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">▶ YouTube: ${s.videoSearchTerm}</a>` : ''}
+              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">▶ YouTube: ${s.videoSearchTerm}[cite: 12]</a>` : ''}
             </div>
           `;
         }).join('');
@@ -442,10 +438,10 @@
 
     function getPaceRangeForZone(baseSecs, zone) {
       if (zone && (zone.includes('Z2') || zone.includes('QUEIMA DE GORDURA'))) {
-        return '7:00 - 7:35 /km';
+        return '7:00 - 7:35 /km[cite: 12]';
       }
       if (zone && (zone.includes('Z4') || zone.includes('Z3') || zone.includes('MODERADO'))) {
-        return '5:45 - 6:30 /km';
+        return '5:45 - 6:30 /km[cite: 12]';
       }
 
       let minMultiplier = 1.0;
@@ -453,11 +449,11 @@
 
       if (zone === 'Z1') { minMultiplier = 1.15; maxMultiplier = 1.30; }
       else if (zone === 'Z5') { minMultiplier = 0.75; maxMultiplier = 0.84; }
-      else { return 'Livre'; }
+      else { return 'Livre[cite: 12]'; }
 
       const paceMin = formatPace(baseSecs * minMultiplier);
       const paceMax = formatPace(baseSecs * maxMultiplier);
-      return `${paceMin} - ${paceMax} /km`;
+      return `${paceMin} - ${paceMax} /km[cite: 12]`;
     }
 
     function getObjectiveMatrix(objective, dynamicTargetKm) {
@@ -467,52 +463,51 @@
       const longKm = (target * 0.40).toFixed(1);
       const regenKm = "3.5";
 
-      // Normaliza o texto recebido para identificar o objetivo corretamente
       const objStr = String(objective || "").toLowerCase();
 
       if (objStr.includes("5km") || objStr.includes("5 km")) {
         return {
           targetVolume: target,
-          text: "Meta: 5 km (Velocidade)",
-          rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
+          text: "Meta: 5 km (Velocidade)[cite: 12]",
+          rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.[cite: 12]",
           sessions: [
-            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Articular", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Amplitude de passada e flexibilidade de quadril.", effort: "Soltura articular", videoSearchTerm: "Mobilidade para corredores 5km" },
-            { dayOfWeek: "Terça-feira", sessionType: "Tiros / Intervalado Curto", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries rápidas para ganho de velocidade pura.", effort: "Respiração muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade" },
-            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura leve em ritmo conversacional.", effort: "Ritmo bem confortável", videoSearchTerm: "Rodagem leve recuperação corrida" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos na meta de velocidade pretendida.", effort: "Sustentado e desafiador", videoSearchTerm: "Como baixar o tempo nos 5km" },
-            { dayOfWeek: "Sexta-feira", sessionType: "Descanso Ativo / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular e liberação leve.", effort: "Soltura muscular", videoSearchTerm: "Liberação miofascial corredores" },
-            { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Aeróbico Moderado", isRun: true, suggestedDist: `${longKm} km`, description: "Base aeróbica para sustentação de ritmo.", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado corrida" },
-            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa.", effort: "Repouso total", videoSearchTerm: "" }
+            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Articular", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Amplitude de passada e flexibilidade de quadril.[cite: 12]", effort: "Soltura articular", videoSearchTerm: "Mobilidade para corredores 5km[cite: 12]" },
+            { dayOfWeek: "Terça-feira", sessionType: "Tiros / Intervalado Curto", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries rápidas para ganho de velocidade pura.[cite: 12]", effort: "Respiração muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade[cite: 12]" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura leve em ritmo conversacional.[cite: 12]", effort: "Ritmo bem confortável", videoSearchTerm: "Rodagem leve recuperação corrida[cite: 12]" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos na meta de velocidade pretendida.[cite: 12]", effort: "Sustentado e desafiador", videoSearchTerm: "Como baixar o tempo nos 5km[cite: 12]" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Descanso Ativo / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular e liberação leve.[cite: 12]", effort: "Soltura muscular", videoSearchTerm: "Liberação miofascial corredores[cite: 12]" },
+            { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Aeróbico Moderado", isRun: true, suggestedDist: `${longKm} km`, description: "Base aeróbica para sustentação de ritmo.[cite: 12]", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado corrida[cite: 12]" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa.[cite: 12]", effort: "Repouso total", videoSearchTerm: "" }
           ]
         };
       } else if (objStr.includes("10km") || objStr.includes("10 km") || objStr.includes("baixar tempo")) {
         return {
           targetVolume: target,
-          text: "Meta: 10 km (Resistência & Pace)",
-          rationale: "Motor em modo <strong>10 km</strong>: Foco em limiar anaeróbico (Z4) e expansão da resistência de base.",
+          text: "Meta: 10 km (Resistência & Pace)[cite: 12]",
+          rationale: "Motor em modo <strong>10 km</strong>: Foco em limiar anaeróbico (Z4) e expansão da resistência de base.[cite: 12]",
           sessions: [
-            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Dinâmica", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Foco em cadeia posterior e estabilização.", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores 10km" },
-            { dayOfWeek: "Terça-feira", sessionType: "Intervalado Médio (Cruzeiro)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries longas para sustentação de limiar.", effort: "Forte e sustentado", videoSearchTerm: "Treino intervalado 10km" },
-            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura ativa para recuperação.", effort: "Leve", videoSearchTerm: "Rodagem regenerativa" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico 10k", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos no pace planejado para prova.", effort: "Ritmo constante", videoSearchTerm: "Ritmo de prova 10km" },
-            { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular.", effort: "Soltura", videoSearchTerm: "" },
-            { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa construindo ritmo na segunda metade.", effort: "Constante", videoSearchTerm: "Treino longo 10km" },
-            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.", effort: "Repouso", videoSearchTerm: "" }
+            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Dinâmica", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Foco em cadeia posterior e estabilização.[cite: 12]", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores 10km[cite: 12]" },
+            { dayOfWeek: "Terça-feira", sessionType: "Intervalado Médio (Cruzeiro)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries longas para sustentação de limiar.[cite: 12]", effort: "Forte e sustentado", videoSearchTerm: "Treino intervalado 10km[cite: 12]" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura ativa para recuperação.[cite: 12]", effort: "Leve", videoSearchTerm: "Rodagem regenerativa[cite: 12]" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico 10k", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos no pace planejado para prova.[cite: 12]", effort: "Ritmo constante", videoSearchTerm: "Ritmo de prova 10km[cite: 12]" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular.[cite: 12]", effort: "Soltura", videoSearchTerm: "" },
+            { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa construindo ritmo na segunda metade.[cite: 12]", effort: "Constante", videoSearchTerm: "Treino longo 10km[cite: 12]" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.[cite: 12]", effort: "Repouso", videoSearchTerm: "" }
           ]
         };
       } else {
         return {
           targetVolume: target,
-          text: "Perda de Peso Progressiva",
-          rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).",
+          text: "Perda de Peso Progressiva[cite: 12]",
+          rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).[cite: 12]",
           sessions: [
-            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Sessão regenerativa e foco em amplitude.", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores" },
-            { dayOfWeek: "Terça-feira", sessionType: "Rodagem / Intervalado", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: `${intervalKm} km`, description: "Estímulo para gasto calórico.", effort: "Moderado", videoSearchTerm: "Treino intervalado para emagrecer" },
-            { dayOfWeek: "Quarta-feira", sessionType: "Educativos", zone: "Z1", zoneDesc: "Técnica", isRun: false, duration: "25 min", description: "Drills de técnica de passada.", effort: "Coordenação", videoSearchTerm: "Drills de corrida" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Corrida Leve (Z2)", zone: "Z2", zoneDesc: "Queima de Gordura", isRun: true, suggestedDist: `${easyKm} km`, description: "Rodagem aeróbica contínua em ritmo conversacional.", effort: "Conversacional", videoSearchTerm: "Educativos de corrida" },
-            { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação ativa.", effort: "Soltura", videoSearchTerm: "Liberação miofascial" },
-            { dayOfWeek: "Sábado", sessionType: "Longo de Base", zone: "Z2", zoneDesc: "Aeróbico Extendido", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa para consumo de gordura.", effort: "Constante", videoSearchTerm: "Treino longo para perda de peso" },
-            { dayOfWeek: "Domingo", sessionType: "Descanso", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Descanso total.", effort: "Repouso", videoSearchTerm: "" }
+            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Sessão regenerativa e foco em amplitude.[cite: 12]", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores[cite: 12]" },
+            { dayOfWeek: "Terça-feira", sessionType: "Rodagem / Intervalado", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: `${intervalKm} km`, description: "Estímulo para gasto calórico.[cite: 12]", effort: "Moderado", videoSearchTerm: "Treino intervalado para emagrecer[cite: 12]" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Educativos", zone: "Z1", zoneDesc: "Técnica", isRun: false, duration: "25 min", description: "Drills de técnica de passada.[cite: 12]", effort: "Coordenação", videoSearchTerm: "Drills de corrida[cite: 12]" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Corrida Leve (Z2)", zone: "Z2", zoneDesc: "Queima de Gordura", isRun: true, suggestedDist: `${easyKm} km`, description: "Rodagem aeróbica contínua em ritmo conversacional.[cite: 12]", effort: "Conversacional", videoSearchTerm: "Educativos de corrida[cite: 12]" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação ativa.[cite: 12]", effort: "Soltura", videoSearchTerm: "Liberação miofascial[cite: 12]" },
+            { dayOfWeek: "Sábado", sessionType: "Longo de Base", zone: "Z2", zoneDesc: "Aeróbico Extendido", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa para consumo de gordura.[cite: 12]", effort: "Constante", videoSearchTerm: "Treino longo para perda de peso[cite: 12]" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Descanso total.[cite: 12]", effort: "Repouso", videoSearchTerm: "" }
           ]
         };
       }
@@ -544,7 +539,7 @@
           body: JSON.stringify(newWorkout)
         });
 
-        if (!response.ok) throw new Error('Erro ao salvar no banco de dados');
+        if (!response.ok) throw new Error('Erro ao salvar no banco de dados[cite: 12]');
 
         document.getElementById('workout-form').reset();
         document.getElementById('activityDate').valueAsDate = new Date();
@@ -553,10 +548,10 @@
         
         loadDashboard();
         loadGamification();
-        alert('Atividade salva com sucesso diretamente no banco de dados!');
+        alert('Atividade salva com sucesso diretamente no banco de dados![cite: 12]');
       } catch (err) {
         console.error(err);
-        alert('Erro ao salvar atividade no servidor.');
+        alert('Erro ao salvar atividade no servidor.[cite: 12]');
       }
     }
 
@@ -565,7 +560,7 @@
       const fileInput = document.getElementById('gpxFiles');
       
       if (fileInput.files.length === 0) {
-        alert('Selecione pelo menos um arquivo GPX.');
+        alert('Selecione pelo menos um arquivo GPX.[cite: 12]');
         return;
       }
 
@@ -582,12 +577,12 @@
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || 'Erro ao importar arquivos GPX');
+          throw new Error(errData.error || 'Erro ao importar arquivos GPX[cite: 12]');
         }
 
         loadDashboard();
         loadGamification();
-        alert(`${fileInput.files.length} arquivo(s) GPX importado(s) com sucesso!`);
+        alert(`${fileInput.files.length} arquivo(s) GPX importado(s) com sucesso![cite: 12]`);
         document.getElementById('gpx-form').reset();
       } catch (err) {
         console.error(err);
@@ -605,7 +600,7 @@
         const data = await res.json();
 
         const p = data.progress;
-        document.getElementById('userLevelBadge').innerText = `NÍVEL ${p.level}`;
+        document.getElementById('userLevelBadge').innerText = `NÍVEL ${p.level}[cite: 12]`;
         document.getElementById('currentXpText').innerText = p.xpInCurrentLevel;
         document.getElementById('nextLevelXpText').innerText = p.xpForNextLevel;
         
@@ -618,7 +613,7 @@
         container.innerHTML = data.badges.map(b => {
           const isLocked = !b.isUnlocked;
           const activeIcon = b.activeTier ? b.activeTier.icon : '🔒';
-          const activeName = b.activeTier ? b.activeTier.name : 'Bloqueado';
+          const activeName = b.activeTier ? b.activeTier.name : 'Bloqueado[cite: 12]';
           const targetVal = b.nextTier ? b.nextTier.target : (b.activeTier ? b.activeTier.target : 100);
           const progressPct = Math.min(100, Math.round((b.currentValue / targetVal) * 100));
 
@@ -629,11 +624,11 @@
                   ${activeIcon}
                 </div>
                 <div style="flex: 1;">
-                  <div style="font-size: 13px; font-weight: 700; color: #f8fafc;">${b.title}</div>
-                  <div style="font-size: 11px; color: #38bdf8; font-weight: 600;">${activeName}</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #f8fafc;">${b.title}[cite: 12]</div>
+                  <div style="font-size: 11px; color: #38bdf8; font-weight: 600;">${activeName}[cite: 12]</div>
                 </div>
                 <div style="font-size: 11px; font-weight: 700; color: #94a3b8;">
-                  ${b.currentValue} / ${targetVal}
+                  ${b.currentValue} / ${targetVal}[cite: 12]
                 </div>
               </div>
               <div style="width: 100%; background: #1e293b; height: 6px; border-radius: 3px; overflow: hidden;">
