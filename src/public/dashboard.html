@@ -253,9 +253,7 @@
           <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <span>🏆 Conquistas & Evolução</span>
           </div>
-          <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Renderizado dinamicamente pelo JavaScript -->
-          </div>
+          <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
 
         </div>
       </div>
@@ -274,7 +272,6 @@
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         const rawProfile = data.profile || {};
         
-        // Prioriza o peso atualizado salvo no localStorage ou profile do backend
         const storedWeight = localStorage.getItem('user_current_weight');
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
@@ -295,7 +292,6 @@
         const dayOfWeek = now.getDay();
         const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
         
-        // Semana Atual (Segunda a Domingo)
         const startOfCurrentWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
         startOfCurrentWeek.setHours(0, 0, 0, 0);
 
@@ -303,7 +299,6 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // Semana Anterior CORRIGIDA (Termina no domingo anterior, com duração completa de 7 dias)
         const startOfPreviousWeek = new Date(startOfCurrentWeek);
         startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
         startOfPreviousWeek.setHours(0, 0, 0, 0);
@@ -328,7 +323,6 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // Se houver volume na semana passada, usa o multiplicador dinâmico; senão, usa o alvo base do objetivo
         const dynamicTargetKm = previousWeekKm > 0 ? (previousWeekKm * multiplier) : (objectiveConfig.targetVolume || 23.33);
         const basePaceSecs = calculateBasePace(workouts);
 
@@ -560,7 +554,6 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        // 1. Atualizar Barra de XP
         const p = data.progress;
         document.getElementById('userLevelBadge').innerText = `NÍVEL ${p.level}`;
         document.getElementById('currentXpText').innerText = p.xpInCurrentLevel;
@@ -569,7 +562,6 @@
         const pct = Math.min(100, Math.round((p.xpInCurrentLevel / p.xpForNextLevel) * 100));
         document.getElementById('xpProgressBar').style.width = `${pct}%`;
 
-        // 2. Renderizar Badges Evolutivas
         const container = document.getElementById('badgesContainer');
         if (!container) return;
         
@@ -594,7 +586,6 @@
                   ${b.currentValue} / ${targetVal}
                 </div>
               </div>
-              <!-- Barra do Próximo Patamar -->
               <div style="width: 100%; background: #1e293b; height: 6px; border-radius: 3px; overflow: hidden;">
                 <div style="width: ${progressPct}%; background: #10b981; height: 100%;"></div>
               </div>
@@ -610,7 +601,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       loadGamification();
     });
-
   </script>
 </body>
 </html>

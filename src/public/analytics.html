@@ -27,11 +27,11 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: var(--bg-main); color: var(--text-main); padding: 30px; }
         .container { 
-  max-width: 1200px; 
-  margin: 0 auto; 
-  padding: 30px 20px; 
-  box-sizing: border-box; 
-}
+          max-width: 1200px; 
+          margin: 0 auto; 
+          padding: 30px 20px; 
+          box-sizing: border-box; 
+        }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
         h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; letter-spacing: -0.5px; }
         .subtitle { color: var(--text-muted); font-size: 14px; }
@@ -51,10 +51,9 @@
         .section-title { font-size: 18px; font-weight: 700; color: var(--text-main); margin: 0; }
         .current-week-badge { background-color: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; }
         
-        /* Grid Semanal Inteligente: Cards opacos por padrão e cor viva no hover/clique */
         .calendar-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 16px; }
         .day-card { 
-            background-color: rgba(19, 27, 46, 0.5); /* Opaco por padrão */
+            background-color: rgba(19, 27, 46, 0.5);
             border: 1px solid rgba(30, 41, 59, 0.6); 
             border-radius: 10px; 
             padding: 14px 10px; 
@@ -68,26 +67,20 @@
             opacity: 0.65;
         }
         .day-card:hover, .day-card.active-audit { 
-            background-color: var(--bg-card); /* Cor viva */
+            background-color: var(--bg-card);
             border-color: var(--accent-blue); 
             opacity: 1;
             transform: translateY(-2px); 
             box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
         }
-        .day-card.today { 
-            opacity: 0.95;
-            border-color: rgba(56, 189, 248, 0.6);
-        }
-        .day-card.completed {
-            opacity: 0.9;
-        }
+        .day-card.today { opacity: 0.95; border-color: rgba(56, 189, 248, 0.6); }
+        .day-card.completed { opacity: 0.9; }
         .day-name { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
         .day-date { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
         .day-icon { font-size: 18px; margin: 2px 0; }
         .day-km { font-size: 13px; font-weight: 800; color: var(--accent-blue); }
         .check-badge { font-size: 11px; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border-radius: 4px; padding: 2px 4px; margin-top: 4px; font-weight: 700; display: inline-block; }
 
-        /* Acordeão de Auditoria por Clique */
         .workout-audit-drawer { background: var(--bg-card); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); display: none; animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
         .audit-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
@@ -97,7 +90,6 @@
         .audit-item h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
         .audit-item p { font-size: 13px; color: var(--text-main); line-height: 1.4; }
 
-        /* Coach Virtual */
         .coach-verdict-card { background: linear-gradient(135deg, #131b2e 0%, #1e1b4b 100%); border: 1px solid var(--accent-purple); border-radius: 12px; padding: 24px; margin-bottom: 30px; position: relative; }
         .coach-verdict-card h3 { color: var(--accent-purple); font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .coach-verdict-card p { color: var(--text-main); font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
@@ -128,10 +120,10 @@
                 <div class="subtitle">Monitoramento de carga ACWR e recordes pessoais estimados via banco de dados.</div>
             </div>
             <div class="nav-links">
-                <a href="/dashboard.html">Dashboard</a>
-                <a href="/profile.html">Meu Perfil</a>
-                <a href="/history.html">Histórico</a>
-                <a href="/analytics.html" class="active">Análise</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="profile.html">Meu Perfil</a>
+                <a href="history.html">Histórico</a>
+                <a href="analytics.html" class="active">Análise</a>
             </div>
         </header>
 
@@ -153,7 +145,6 @@
         </div>
         <div class="calendar-week-grid" id="calendar-grid"></div>
 
-        <!-- Acordeão Inteligente (Toggle por Clique) -->
         <div id="workout-audit-drawer" class="workout-audit-drawer">
             <div class="audit-header">
                 <div class="audit-title" id="audit-drawer-title">⚡ Auditoria Clínica do Treino</div>
@@ -166,7 +157,6 @@
             </div>
         </div>
 
-        <!-- Veredito do Coach -->
         <div class="coach-verdict-card" id="coach-verdict-section">
             <h3>🤖 Veredito do Coach Virtual (Fechamento da Semana)</h3>
             <p id="coach-summary-text">Processando feedback comportamental e de carga dos últimos 7 dias...</p>
@@ -203,7 +193,6 @@
 
         async function loadAnalytics() {
             try {
-                // Busca em paralelo os treinos executados e o plano de treino atual
                 const [workoutsRes, planRes] = await Promise.all([
                     fetch('/api/workouts'),
                     fetch('/api/plan')
@@ -316,7 +305,6 @@
             }
         }
 
-        // Lógica de Toggle por Clique no Card (Abre ou Recolhe)
         function toggleWorkoutAudit(dateString, hasWorkout, elementCard) {
             const drawer = document.getElementById('workout-audit-drawer');
             
@@ -388,7 +376,6 @@
             monday.setHours(0, 0, 0, 0);
 
             const daysLabels = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-            const dayNamesMap = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
             let htmlCards = '';
             let currentWeekTotalKm = 0;
 
@@ -404,7 +391,6 @@
                 const dayWorkouts = workouts.filter(w => w.activityDate && w.activityDate.substring(0, 10) === dateString);
                 const hasWorkout = dayWorkouts.length > 0;
                 
-                // Procura a sessão correspondente no plano semanal da API
                 const dayLabelName = daysLabels[i];
                 const matchedPlanSession = planSessions.find(s => {
                     if (!s.day) return false;
@@ -418,7 +404,6 @@
                 let checkBadgeHtml = '';
 
                 if (hasWorkout) {
-                    // Há treino executado: exibe dados reais e o check de aderência ✅
                     const runWorkout = dayWorkouts.find(w => !w.type || w.type === 'corrida' || (w.distanceKm || w.distance) > 0);
                     const mobilityWorkout = dayWorkouts.find(w => w.type === 'mobilidade' || (w.title && w.title.toLowerCase().includes('mobilidade')));
                     const drillWorkout = dayWorkouts.find(w => w.type === 'educativo' || (w.title && w.title.toLowerCase().includes('educativo')));
@@ -444,7 +429,6 @@
                     }
                     checkBadgeHtml = `<div class="check-badge">✅ Concluído</div>`;
                 } else if (matchedPlanSession) {
-                    // Não há log, mas o plano propõe algo para este dia (ex: Sábado = Longão)
                     displayInfo = matchedPlanSession.title || matchedPlanSession.type || 'Proposto';
                     const titleLower = (matchedPlanSession.title || '').toLowerCase();
                     if (titleLower.includes('longao') || titleLower.includes('corrida') || titleLower.includes('z2')) {
