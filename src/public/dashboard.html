@@ -165,7 +165,6 @@
       <div class="metric-card">
         <div class="metric-label">Volume Alvo (Dinâmico)</div>
         <div class="metric-value" id="m-target-km">0.0 km</div>
-        <!-- Indicador cirúrgico da semana do ciclo adicionado mantendo o design original -->
         <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
       </div>
       <div class="metric-card">
@@ -286,9 +285,6 @@
         };
 
         const obj = profile.objective || "perda_peso";
-        const objectiveConfig = getObjectiveMatrix(obj);
-        const multiplier = objectiveConfig.multiplier;
-        const objectiveCustomText = objectiveConfig.text;
 
         // Lógica de cálculo unificada com a aba de Análise
         const now = new Date();
@@ -316,7 +312,7 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // Busca o volume consolidado utilizando janela móvel segura (espelhando a aba de análise)
+        // Busca o volume consolidado utilizando janela móvel segura
         const sortedRuns = workouts
           .filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0)
           .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
@@ -338,11 +334,11 @@
             .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
         }
 
-        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : (objectiveConfig.targetVolume || 23.33);
+        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : 23.33;
         
-        // Cálculo dinâmico do ciclo de 4 semanas (Semanas 1 a 3: Progressão | Semana 4: Deload)
+        // Cálculo dinâmico do ciclo de 4 semanas
         const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
-        let cycleMultiplier = multiplier;
+        let cycleMultiplier = 1.05;
         let cycleWeekName = '';
 
         switch (cycleWeekNumber) {
@@ -365,6 +361,11 @@
         }
 
         const dynamicTargetKm = baseVolForProgression * cycleMultiplier;
+        
+        // Agora chamamos a matriz passando o volume dinâmico calculado
+        const objectiveConfig = getObjectiveMatrix(obj, dynamicTargetKm);
+        const objectiveCustomText = objectiveConfig.text;
+
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
@@ -394,21 +395,8 @@
           let detailsHtml = '';
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
-            
-            let calculatedDist = s.suggestedDist;
-            if (dynamicTargetKm) {
-              const sTypeLower = (s.sessionType || '').toLowerCase();
-              if (s.dayOfWeek.includes('Sábado') || sTypeLower.includes('longo') || sTypeLower.includes('longão')) {
-                calculatedDist = `${(dynamicTargetKm * 0.40).toFixed(1)} km`;
-              } else if (sTypeLower.includes('intervalado') || sTypeLower.includes('tiros') || sTypeLower.includes('ritmo')) {
-                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
-              } else {
-                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
-              }
-            }
-
             detailsHtml = `
-              <span>📏 Volume Proposto: <strong>${calculatedDist}</strong></span>
+              <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
               <span>🎯 Esforço: <strong>${s.effort}</strong></span>
             `;
@@ -475,36 +463,47 @@
       return `${paceMin} - ${paceMax} /km`;
     }
 
-    function getObjectiveMatrix(objective) {
+    function getObjectiveMatrix(objective, dynamicTargetKm) {
+      const target = dynamicTargetKm || 24.4;
+
+      // Divisão proporcional inteligente baseada no volume alvo da semana:
+      // - Intervalado / Terça: ~25%
+      // - Rodagem Leve / Quinta: ~35%
+      // - Longo de Base / Sábado: ~40%
+      const intervalKm = (target * 0.25).toFixed(1);
+      const easyKm = (target * 0.35).toFixed(1);
+      const longKm = (target * 0.40).toFixed(1);
+      const regenKm = "3.5";
+
       if (objective === "5km") {
         return {
           multiplier: 1.05,
-          targetVolume: 22.0,
+          targetVolume: target,
           text: "Meta: 5 km (Velocidade)",
           rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
           sessions: [
             { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Articular", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Amplitude de passada e flexibilidade de quadril.", effort: "Soltura articular", videoSearchTerm: "Mobilidade para corredores 5km" },
-            { dayOfWeek: "Terça-feira", sessionType: "Tiros / Intervalado Curto", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: "5.0 km", description: "Séries rápidas para ganho de velocidade pura.", effort: "Respiração muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade" },
-            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: "3.5 km", description: "Soltura leve em ritmo conversacional.", effort: "Ritmo bem confortável", videoSearchTerm: "Rodagem leve recuperação corrida" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: "6.0 km", description: "Blocos contínuos na meta de velocidade pretendida.", effort: "Sustentado e desafiador", videoSearchTerm: "Como baixar o tempo nos 5km" },
+            { dayOfWeek: "Terça-feira", sessionType: "Tiros / Intervalado Curto", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries rápidas para ganho de velocidade pura.", effort: "Respiração muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura leve em ritmo conversacional.", effort: "Ritmo bem confortável", videoSearchTerm: "Rodagem leve recuperação corrida" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos na meta de velocidade pretendida.", effort: "Sustentado e desafiador", videoSearchTerm: "Como baixar o tempo nos 5km" },
             { dayOfWeek: "Sexta-feira", sessionType: "Descanso Ativo / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular e liberação leve.", effort: "Soltura muscular", videoSearchTerm: "Liberação miofascial corredores" },
-            { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Aeróbico Moderado", isRun: true, suggestedDist: "7.5 km", description: "Base aeróbica para sustentação de ritmo.", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado corrida" },
+            { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Aeróbico Moderado", isRun: true, suggestedDist: `${longKm} km`, description: "Base aeróbica para sustentação de ritmo.", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado corrida" },
             { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa.", effort: "Repouso total", videoSearchTerm: "" }
           ]
         };
       } else {
         return {
           multiplier: 1.08,
-          targetVolume: 24.4,
+          targetVolume: target,
           text: "Perda de Peso Progressiva",
           rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).",
           sessions: [
             { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Sessão regenerativa e foco em amplitude.", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores" },
-            { dayOfWeek: "Terça-feira", sessionType: "Rodagem / Intervalado", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: "6.0 km", description: "Estímulo para gasto calórico.", effort: "Moderado", videoSearchTerm: "Treino intervalado para emagrecer" },
+            { dayOfWeek: "Terça-feira", sessionType: "Rodagem / Intervalado", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: `${intervalKm} km`, description: "Estímulo para gasto calórico.", effort: "Moderado", videoSearchTerm: "Treino intervalado para emagrecer" },
             { dayOfWeek: "Quarta-feira", sessionType: "Educativos", zone: "Z1", zoneDesc: "Técnica", isRun: false, duration: "25 min", description: "Drills de técnica de passada.", effort: "Coordenação", videoSearchTerm: "Drills de corrida" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Corrida Leve (Z2)", zone: "Z2", zoneDesc: "Queima de Gordura", isRun: true, suggestedDist: "5.0 km", description: "Rodagem aeróbica contínua em ritmo conversacional.", effort: "Conversacional", videoSearchTerm: "Educativos de corrida" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Corrida Leve (Z2)", zone: "Z2", zoneDesc: "Queima de Gordura", isRun: true, suggestedDist: `${easyKm} km`, description: "Rodagem aeróbica contínua em ritmo conversacional.", effort: "Conversacional", videoSearchTerm: "Educativos de corrida" },
             { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação ativa.", effort: "Soltura", videoSearchTerm: "Liberação miofascial" },
-            { dayOfWeek: "Sábado", sessionType: "Longo de Base", zone: "Z2", zoneDesc: "Aeróbico Extendido", isRun: true, suggestedDist: "9.0 km", description: "Rodagem longa para consumo de gordura.", effort: "Constante", videoSearchTerm: "Treino longo para perda de peso" },
+            { dayOfWeek: "Sábado", sessionType: "Longo de Base", zone: "Z2", zoneDesc: "Aeróbico Extendido", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa para consumo de gordura.", effort: "Constante", videoSearchTerm: "Treino longo para perda de peso" },
             { dayOfWeek: "Domingo", sessionType: "Descanso", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Descanso total.", effort: "Repouso", videoSearchTerm: "" }
           ]
         };
