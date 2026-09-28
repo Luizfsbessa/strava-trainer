@@ -56,7 +56,7 @@ export class ProgressionService {
     };
   }
 
-  // Motor de auditoria ajustado para tratar trocas de dias como "Divergência no Treino" sem o rótulo confuso de inversão
+  // Motor de auditoria ajustado para tolerar a progressão sustentável de ~5%
   public static auditWorkoutExecution(plannedType: string, executedVolume: number, plannedVolume?: number) {
     if (plannedType === 'Descanso Total' && executedVolume > 0) {
       return {
@@ -65,7 +65,8 @@ export class ProgressionService {
       };
     }
 
-    if (plannedVolume && executedVolume > plannedVolume * 1.1) {
+    // Ajustado para acionar alerta se passar de 5-8% do volume esperado da sessão
+    if (plannedVolume && executedVolume > plannedVolume * 1.08) {
       return {
         complianceLabel: 'Divergência no Treino',
         message: `Superávit de Carga: Volume acima do programado (${executedVolume} km vs ${plannedVolume} km esperados).`
@@ -142,17 +143,18 @@ export class ProgressionService {
       : 1.0;
 
     let status: WeeklyProgressionReport['status'] = 'ZONA_OTIMA';
-    let feedbackMessage = 'Volume e carga equilibrados. Ótimo ritmo de evolução!';
+    let feedbackMessage = 'Volume e carga equilibrados. Ritmo de evolução sustentável de 5%!';
 
-    if (acwrRatio > 1.5) {
+    // Limiares ajustados para a progressão conservadora/saudável
+    if (acwrRatio > 1.4 || volumeChangePercentage > 15) {
       status = 'ALERTA_OVERTRAINING';
-      feedbackMessage = 'Cuidado! Aumento muito brusco de estresse/carga. Alto risco de lesão. Priorize treinos regenerativos ou descanso.';
-    } else if (volumeChangePercentage > 25 || acwrRatio > 1.3) {
+      feedbackMessage = 'Atenção! O volume ou a carga subiram acima da meta sustentável de 5-8%. Risco de sobrecarga nos tendões. Considere um deload.';
+    } else if (volumeChangePercentage > 6 || acwrRatio > 1.2) {
       status = 'ATENCAO_VOLUME';
-      feedbackMessage = 'Seu volume em km subiu rápido nesta semana, mas sua carga acumulada continua controlada. Mantenha os treinos leves!';
+      feedbackMessage = 'Ritmo ligeiramente acima do ideal de 5%. Mantenha os próximos treinos focados em zonas leves (Z2).';
     } else if (acwrRatio < 0.8 && previousWeekKm > 0) {
       status = 'DESCANSO_RECOMENDADO';
-      feedbackMessage = 'A carga recente está abaixo da sua média. Ótimo momento para iniciar uma nova fase de carga ou treinos focados em ritmo.';
+      feedbackMessage = 'Carga abaixo da média recente. Perfeito para absorção ou aplicação de microciclo de intensidade.';
     }
 
     const personalRecords = this.findPersonalRecords(workouts);

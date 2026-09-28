@@ -28,14 +28,12 @@ export class TrainingPlanService {
     report: WeeklyProgressionReport,
     userPaceSettings?: UserPaceSettings
   ): NextWeekPlan {
-    // CORREÇÃO: Se o volume da semana atual for 0 (início de semana), usa a semana passada como base de cálculo
     const baseVolumeForCalc = report.currentWeekKm > 0 ? report.currentWeekKm : (report.previousWeekKm > 0 ? report.previousWeekKm : 24.4);
     
     let targetVolume = baseVolumeForCalc;
-    let strategy: NextWeekPlan['strategy'] = 'MANUTENCAO';
+    let strategy: NextWeekPlan['strategy'] = 'AUMENTO_GRADUAL';
     let rationale = '';
 
-    // Define os limites dinâmicos com fallback para os valores ajustados ao seu histórico
     const z2Min = userPaceSettings?.targetPaceZ2Min || '7:00';
     const z2Max = userPaceSettings?.targetPaceZ2Max || '7:35';
     const z4Min = userPaceSettings?.targetPaceZ4Min || '5:45';
@@ -44,48 +42,92 @@ export class TrainingPlanService {
     const z2ZoneFormatted = `${z2Min} - ${z2Max} min/km`;
     const z4ZoneFormatted = `${z4Min} - ${z4Max} min/km`;
 
-    // 1. Definição da Estratégia
+    // 1. Identificação Dinâmica da Semana do Ciclo (Módulo de 4 semanas)
+    // Usamos o volume atual ou uma estimativa de ciclos baseada na semana do ano/histórico para alternar o bloco
+    const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
+
+    let intervalSplit = 0.20;
+    let easySplit = 0.50;
+    let longSplit = 0.30;
+    let cycleFocusDescription = '';
+
+    // Sobrescrita de segurança para casos de fadiga crítica
     if (report.status === 'ALERTA_OVERTRAINING' || report.acwrRatio > 1.4) {
       strategy = 'REGENERACAO_FORCADA';
       targetVolume = Number((baseVolumeForCalc * 0.75).toFixed(2));
-      rationale = 'Sua carga recente está elevada (risco de fadiga/lesão). A próxima semana será de regeneração para permitir supercompensação.';
-    } else if (report.status === 'ATENCAO_VOLUME') {
-      strategy = 'MANUTENCAO';
-      targetVolume = Number((baseVolumeForCalc * 1.0).toFixed(2));
-      rationale = 'O volume da última semana subiu rápido. Recomendamos consolidar essa quilometragem sem aumentos por enquanto.';
+      rationale = 'Sua carga recente está elevada (risco de fadiga/lesão). Ativado protocolo de regeneração forçada.';
+      intervalSplit = 0.10;
+      easySplit = 0.60;
+      longSplit = 0.30;
+      cycleFocusDescription = ' [Modo Recuperação Ativa]';
     } else {
-      strategy = 'AUMENTO_GRADUAL';
-      targetVolume = Number((baseVolumeForCalc * 1.08).toFixed(2));
-      rationale = 'Sua relação de carga (ACWR) está na Zona Doce. Aumentaremos o volume em ~8% para manter a evolução aeróbica e a perda de peso.';
+      // Comportamento cíclico estruturado de 4 semanas
+      switch (cycleWeekNumber) {
+        case 1: // Semana 1: Foco em Base e Recuperação pós-ciclo anterior (+5% volume)
+          targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
+          strategy = 'AUMENTO_GRADUAL';
+          intervalSplit = 0.15;
+          easySplit = 0.60;
+          longSplit = 0.25;
+          rationale = 'Semana 1 do Ciclo: Foco em construção de base aeróbica e rodagens confortáveis (Z2). Progressão de 5%.';
+          break;
+
+        case 2: // Semana 2: Foco em Ritmo e Intervalado Moderado (+5% volume)
+          targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
+          strategy = 'AUMENTO_GRADUAL';
+          intervalSplit = 0.20;
+          easySplit = 0.50;
+          longSplit = 0.30;
+          rationale = 'Semana 2 do Ciclo: Introdução de treinos intervalados mais densos e ganho de ritmo. Progressão de 5%.';
+          break;
+
+        case 3: // Semana 3: Pico de Carga e Longão Estendido (+5% volume)
+          targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
+          strategy = 'AUMENTO_GRADUAL';
+          intervalSplit = 0.25;
+          easySplit = 0.40;
+          longSplit = 0.35;
+          rationale = 'Semana 3 do Ciclo: Semana de maior exigência física, combinando tiros fortes e longão estendido.';
+          break;
+
+        case 4: // Semana 4: Deload / Regenerativa (-15% a -20% volume para supercompensação)
+          targetVolume = Number((baseVolumeForCalc * 0.85).toFixed(2));
+          strategy = 'MANUTENCAO';
+          intervalSplit = 0.10;
+          easySplit = 0.60;
+          longSplit = 0.30;
+          rationale = 'Semana 4 (Deload): Redução planejada de volume para assimilação de carga, descanso tecidual e supercompensação.';
+          break;
+      }
     }
 
-    // 2. Divisão do Volume Semanal
-    const easyRunKm = Number((targetVolume * 0.30).toFixed(2));
-    const qualityRunKm = Number((targetVolume * 0.25).toFixed(2));
-    const longRunKm = Number((targetVolume * 0.45).toFixed(2));
+    // 2. Divisão do Volume baseada nos Splits Dinâmicos da Semana
+    const intervalRunKm = Number((targetVolume * intervalSplit).toFixed(2));
+    const easyRunKm = Number((targetVolume * easySplit).toFixed(2));
+    const longRunKm = Number((targetVolume * longSplit).toFixed(2));
 
-    // 3. Montagem das Sessões
+    // 3. Montagem das Sessões com os estímulos variáveis
     const sessions: PlannedSession[] = [
       {
         dayOfWeek: 'Segunda-feira',
         sessionType: 'Mobilidade & Core',
-        description: 'Foco em soltura de quadril, mobilidade de tornozelo e estabilização de core para resetar a musculatura.',
+        description: `Mobilidade e estabilização de core.${cycleFocusDescription}`,
         videoSearchTerm: 'mobilidade de quadril e tornozelo para corredores'
       },
       {
         dayOfWeek: 'Terça-feira',
         sessionType: strategy === 'REGENERACAO_FORCADA' ? 'Rodagem Leve (Z1/Z2)' : 'Intervalado / Tiros (Z4/Z5)',
-        targetDistanceKm: qualityRunKm,
+        targetDistanceKm: intervalRunKm,
         targetPaceZone: strategy === 'REGENERACAO_FORCADA' ? z2ZoneFormatted : z4ZoneFormatted,
         description: strategy === 'REGENERACAO_FORCADA' 
-          ? 'Troca de treino de tiro por rodagem leve devido ao pico de carga.' 
-          : 'Aquecimento (1km) + Tiros de 400m/800m no ritmo alvo com descanso ativo.',
+          ? 'Rodagem regenerativa substituta.' 
+          : `Sessão intervalada focada no bloco atual (${Math.round(intervalSplit * 100)}% do volume total).`,
         videoSearchTerm: strategy === 'REGENERACAO_FORCADA' ? 'rodagem regenerativa' : 'treino intervalado de tiros 400m corrida'
       },
       {
         dayOfWeek: 'Quarta-feira',
         sessionType: 'Educativos & Pliometria',
-        description: 'Trabalho estritamente técnico (A-skip, B-skip, educativos de sola) para eficiência mecânica.',
+        description: 'Trabalho técnico de passada (A-skip, B-skip) para eficiência mecânica.',
         videoSearchTerm: 'educativos de corrida a-skip b-skip'
       },
       {
@@ -93,13 +135,13 @@ export class TrainingPlanService {
         sessionType: 'Rodagem Leve (Z1/Z2)',
         targetDistanceKm: easyRunKm,
         targetPaceZone: z2ZoneFormatted,
-        description: 'Corrida em ritmo confortável para promover recuperação ativa e acumular base aeróbica.',
+        description: `Rodagem aeróbica confortável representando ${Math.round(easySplit * 100)}% da quilometragem semanal.`,
         videoSearchTerm: 'rodagem leve zona 2 corrida técnica'
       },      
       {
         dayOfWeek: 'Sexta-feira',
         sessionType: 'Força Específica',
-        description: 'Musculação focada em cadeia posterior, glúteos e trabalho excêntrico de joelho para prevenção de lesões.',
+        description: 'Fortalecimento de cadeia posterior e prevenção de lesões (foco em joelhos e quadris).',
         videoSearchTerm: 'fortalecimento muscular para corredores prevencao de lesao'
       },
       {
@@ -107,13 +149,13 @@ export class TrainingPlanService {
         sessionType: 'Longão (Z2)',
         targetDistanceKm: longRunKm,
         targetPaceZone: z2ZoneFormatted,
-        description: 'Treino de resistência em ritmo constante. Mantenha a frequência cardíaca controlada.',
+        description: `Longão de resistência progressiva (${Math.round(longSplit * 100)}% do volume da semana).`,
         videoSearchTerm: 'longão de corrida estratégia de pacing'
       },
       {
         dayOfWeek: 'Domingo',
         sessionType: 'Descanso Total',
-        description: 'Janela de recuperação absoluta obrigatória para assimilação de carga e prevenção de overtraining.',
+        description: 'Descanso absoluto para absorção biológica dos estímulos e reestruturação muscular.',
         videoSearchTerm: 'descanso e recuperacao ativa na corrida'
       }
     ];
