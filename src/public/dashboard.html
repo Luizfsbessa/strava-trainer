@@ -277,16 +277,16 @@
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
 
+        // CORREÇÃO DO BUG: Lê o objetivo salvo no perfil (localStorage ou backend) de forma dinâmica
+        const savedObjective = localStorage.getItem('user_objective') || rawProfile.objective || rawProfile.trainingObjective || "perda_peso";
+
         const profile = {
           age: rawProfile.age || 39,
           currentWeight: currentWeightNum,
           targetWeight: targetWeightNum,
-          objective: rawProfile.objective || "perda_peso"
+          objective: savedObjective
         };
 
-        const obj = profile.objective || "perda_peso";
-
-        // Lógica de cálculo unificada com a aba de Análise
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         
@@ -312,7 +312,6 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // Busca o volume consolidado utilizando janela móvel segura
         const sortedRuns = workouts
           .filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0)
           .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
@@ -336,7 +335,6 @@
 
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : 23.33;
         
-        // Cálculo dinâmico do ciclo de 4 semanas
         const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
         let cycleMultiplier = 1.05;
         let cycleWeekName = '';
@@ -355,16 +353,15 @@
             cycleWeekName = 'Semana 3: Pico de Carga';
             break;
           case 4:
-            cycleMultiplier = 0.85; // Deload regenerativo planejado
+            cycleMultiplier = 0.85;
             cycleWeekName = 'Semana 4: Deload / Regenerativa';
             break;
         }
 
         const dynamicTargetKm = baseVolForProgression * cycleMultiplier;
         
-        // Agora chamamos a matriz passando o volume dinâmico calculado
-        const objectiveConfig = getObjectiveMatrix(obj, dynamicTargetKm);
-        const objectiveCustomText = objectiveConfig.text;
+        // Passa o objetivo atual para a matriz ajustar o painel e os treinos
+        const objectiveConfig = getObjectiveMatrix(profile.objective, dynamicTargetKm);
 
         const basePaceSecs = calculateBasePace(workouts);
 
@@ -383,7 +380,7 @@
         document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
         document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
         document.getElementById('m-cycle-phase').innerText = cycleWeekName;
-        document.getElementById('m-objective').innerText = objectiveCustomText;
+        document.getElementById('m-objective').innerText = objectiveConfig.text;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
         document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
@@ -465,19 +462,16 @@
 
     function getObjectiveMatrix(objective, dynamicTargetKm) {
       const target = dynamicTargetKm || 24.4;
-
-      // Divisão proporcional inteligente baseada no volume alvo da semana:
-      // - Intervalado / Terça: ~25%
-      // - Rodagem Leve / Quinta: ~35%
-      // - Longo de Base / Sábado: ~40%
       const intervalKm = (target * 0.25).toFixed(1);
       const easyKm = (target * 0.35).toFixed(1);
       const longKm = (target * 0.40).toFixed(1);
       const regenKm = "3.5";
 
-      if (objective === "5km") {
+      // Normaliza o texto recebido para identificar o objetivo corretamente
+      const objStr = String(objective || "").toLowerCase();
+
+      if (objStr.includes("5km") || objStr.includes("5 km")) {
         return {
-          multiplier: 1.05,
           targetVolume: target,
           text: "Meta: 5 km (Velocidade)",
           rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
@@ -491,9 +485,23 @@
             { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa.", effort: "Repouso total", videoSearchTerm: "" }
           ]
         };
+      } else if (objStr.includes("10km") || objStr.includes("10 km") || objStr.includes("baixar tempo")) {
+        return {
+          targetVolume: target,
+          text: "Meta: 10 km (Resistência & Pace)",
+          rationale: "Motor em modo <strong>10 km</strong>: Foco em limiar anaeróbico (Z4) e expansão da resistência de base.",
+          sessions: [
+            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Dinâmica", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Foco em cadeia posterior e estabilização.", effort: "Amplitude", videoSearchTerm: "Mobilidade para corredores 10km" },
+            { dayOfWeek: "Terça-feira", sessionType: "Intervalado Médio (Cruzeiro)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intervalKm} km`, description: "Séries longas para sustentação de limiar.", effort: "Forte e sustentado", videoSearchTerm: "Treino intervalado 10km" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${regenKm} km`, description: "Soltura ativa para recuperação.", effort: "Leve", videoSearchTerm: "Rodagem regenerativa" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico 10k", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${easyKm} km`, description: "Blocos contínuos no pace planejado para prova.", effort: "Ritmo constante", videoSearchTerm: "Ritmo de prova 10km" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação muscular.", effort: "Soltura", videoSearchTerm: "" },
+            { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longKm} km`, description: "Rodagem longa construindo ritmo na segunda metade.", effort: "Constante", videoSearchTerm: "Treino longo 10km" },
+            { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.", effort: "Repouso", videoSearchTerm: "" }
+          ]
+        };
       } else {
         return {
-          multiplier: 1.08,
           targetVolume: target,
           text: "Perda de Peso Progressiva",
           rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura).",
