@@ -288,7 +288,7 @@
         const multiplier = objectiveConfig.multiplier;
         const objectiveCustomText = objectiveConfig.text;
 
-        // Correção rigorosa do intervalo de semanas e do cálculo dinâmico com base na semana anterior
+        // Lógica de cálculo unificada com a aba de Análise
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         
@@ -303,24 +303,7 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        const startOfPreviousWeek = new Date(startOfCurrentWeek);
-        startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
-        startOfPreviousWeek.setHours(0, 0, 0, 0);
-        
-        const endOfPreviousWeek = new Date(startOfCurrentWeek);
-        endOfPreviousWeek.setDate(endOfPreviousWeek.getDate() - 1);
-        endOfPreviousWeek.setHours(23, 59, 59, 999);
-
-        const previousWeekKm = workouts
-          .filter(w => {
-            const isRun = (!w.type || w.type === 'corrida');
-            const wDateStr = w.activityDate || w.date;
-            if (!wDateStr) return false;
-            const wDate = new Date(wDateStr);
-            return isRun && wDate >= startOfPreviousWeek && wDate <= endOfPreviousWeek;
-          })
-          .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
-
+        // Rodagem real da semana atual
         const currentWeekKm = workouts
           .filter(w => {
             const isRun = (!w.type || w.type === 'corrida');
@@ -330,6 +313,28 @@
             return isRun && wDate >= startOfCurrentWeek && wDate <= endOfCurrentWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
+
+        // Busca o volume consolidado utilizando janela móvel segura (espelhando a aba de análise)
+        const sortedRuns = workouts
+          .filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0)
+          .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
+
+        let previousWeekKm = 0;
+        if (sortedRuns.length > 0) {
+          const latestDate = new Date(sortedRuns[0].activityDate || sortedRuns[0].date);
+          const windowStart = new Date(latestDate);
+          windowStart.setDate(windowStart.getDate() - 7);
+          
+          previousWeekKm = workouts
+            .filter(w => {
+              const isRun = (!w.type || w.type === 'corrida');
+              const wDateStr = w.activityDate || w.date;
+              if (!wDateStr) return false;
+              const wDate = new Date(wDateStr);
+              return isRun && wDate >= windowStart && wDate <= latestDate;
+            })
+            .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
+        }
 
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : (objectiveConfig.targetVolume || 23.33);
         const dynamicTargetKm = baseVolForProgression * multiplier;
