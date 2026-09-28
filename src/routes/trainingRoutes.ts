@@ -57,7 +57,6 @@ router.get('/plan', async (req, res) => {
       return acc + (s.targetDistanceKm || s.distanceKm || s.km || 0);
     }, 0) || 0;
 
-    // Cálculo robusto da semana atual considerando UTC para evitar perda de treinos por fuso horário
     const now = new Date();
     const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const day = startOfWeek.getUTCDay();
@@ -76,7 +75,6 @@ router.get('/plan', async (req, res) => {
       })
       .reduce((acc, w) => acc + (w.distanceKm || 0), 0);
 
-    // Garante que o volume recomendado respeita o relatório de progressão real ou o histórico
     const recommendedVolume = report.currentWeekKm > 0 
       ? Number((report.currentWeekKm * 1.05).toFixed(2)) 
       : (plan?.recommendedVolumeKm || totalProposedKm || 2.7);
@@ -86,6 +84,8 @@ router.get('/plan', async (req, res) => {
       recommendedVolumeKm: recommendedVolume,
       currentWeekKm: Number(currentWeekKm.toFixed(2)),
       rationale: plan?.rationale || report?.rationale || 'Plano gerado automaticamente com base na progressão.',
+      cycleWeekNumber: plan?.cycleWeekNumber || 1,
+      cycleWeekName: plan?.cycleWeekName || 'Semana 1: Base',
       sessions: plan?.sessions || [],
       profile: {
         currentWeight: profile.currentWeight,

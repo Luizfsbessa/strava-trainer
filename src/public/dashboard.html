@@ -165,6 +165,8 @@
       <div class="metric-card">
         <div class="metric-label">Volume Alvo (Dinâmico)</div>
         <div class="metric-value" id="m-target-km">0.0 km</div>
+        <!-- Indicador cirúrgico da semana do ciclo adicionado mantendo o design original -->
+        <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Objetivo Atual</div>
@@ -337,7 +339,32 @@
         }
 
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : (objectiveConfig.targetVolume || 23.33);
-        const dynamicTargetKm = baseVolForProgression * multiplier;
+        
+        // Cálculo dinâmico do ciclo de 4 semanas (Semanas 1 a 3: Progressão | Semana 4: Deload)
+        const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
+        let cycleMultiplier = multiplier;
+        let cycleWeekName = '';
+
+        switch (cycleWeekNumber) {
+          case 1:
+            cycleMultiplier = 1.05;
+            cycleWeekName = 'Semana 1: Base e Construção';
+            break;
+          case 2:
+            cycleMultiplier = 1.05;
+            cycleWeekName = 'Semana 2: Ritmo e Densidade';
+            break;
+          case 3:
+            cycleMultiplier = 1.05;
+            cycleWeekName = 'Semana 3: Pico de Carga';
+            break;
+          case 4:
+            cycleMultiplier = 0.85; // Deload regenerativo planejado
+            cycleWeekName = 'Semana 4: Deload / Regenerativa';
+            break;
+        }
+
+        const dynamicTargetKm = baseVolForProgression * cycleMultiplier;
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
@@ -354,10 +381,11 @@
         document.getElementById('subtitle-info').innerText = `Perfil Ativo (Idade: ${profile.age} anos) | Pace Base Calculado: ${formatPace(basePaceSecs)} /km`;
         document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
         document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
+        document.getElementById('m-cycle-phase').innerText = cycleWeekName;
         document.getElementById('m-objective').innerText = objectiveCustomText;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
-        document.getElementById('rationale-box').innerHTML = objectiveConfig.rationale;
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
 
         const sessionsContainer = document.getElementById('sessions-container');
         sessionsContainer.innerHTML = objectiveConfig.sessions.map(s => {

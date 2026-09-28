@@ -13,6 +13,8 @@ export interface NextWeekPlan {
   recommendedVolumeKm: number;
   strategy: 'AUMENTO_GRADUAL' | 'MANUTENCAO' | 'REGENERACAO_FORCADA';
   rationale: string;
+  cycleWeekNumber: number;
+  cycleWeekName: string;
   sessions: PlannedSession[];
 }
 
@@ -43,13 +45,13 @@ export class TrainingPlanService {
     const z4ZoneFormatted = `${z4Min} - ${z4Max} min/km`;
 
     // 1. Identificação Dinâmica da Semana do Ciclo (Módulo de 4 semanas)
-    // Usamos o volume atual ou uma estimativa de ciclos baseada na semana do ano/histórico para alternar o bloco
     const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
 
     let intervalSplit = 0.20;
     let easySplit = 0.50;
     let longSplit = 0.30;
     let cycleFocusDescription = '';
+    let cycleWeekName = '';
 
     // Sobrescrita de segurança para casos de fadiga crítica
     if (report.status === 'ALERTA_OVERTRAINING' || report.acwrRatio > 1.4) {
@@ -59,43 +61,48 @@ export class TrainingPlanService {
       intervalSplit = 0.10;
       easySplit = 0.60;
       longSplit = 0.30;
+      cycleWeekName = 'Modo Recuperação Ativa';
       cycleFocusDescription = ' [Modo Recuperação Ativa]';
     } else {
       // Comportamento cíclico estruturado de 4 semanas
       switch (cycleWeekNumber) {
-        case 1: // Semana 1: Foco em Base e Recuperação pós-ciclo anterior (+5% volume)
+        case 1:
           targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
           strategy = 'AUMENTO_GRADUAL';
           intervalSplit = 0.15;
           easySplit = 0.60;
           longSplit = 0.25;
+          cycleWeekName = 'Semana 1: Foco em Base e Recuperação';
           rationale = 'Semana 1 do Ciclo: Foco em construção de base aeróbica e rodagens confortáveis (Z2). Progressão de 5%.';
           break;
 
-        case 2: // Semana 2: Foco em Ritmo e Intervalado Moderado (+5% volume)
+        case 2:
           targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
           strategy = 'AUMENTO_GRADUAL';
           intervalSplit = 0.20;
           easySplit = 0.50;
           longSplit = 0.30;
+          cycleWeekName = 'Semana 2: Ritmo e Intervalado Moderado';
           rationale = 'Semana 2 do Ciclo: Introdução de treinos intervalados mais densos e ganho de ritmo. Progressão de 5%.';
           break;
 
-        case 3: // Semana 3: Pico de Carga e Longão Estendido (+5% volume)
+        case 3:
           targetVolume = Number((baseVolumeForCalc * 1.05).toFixed(2));
           strategy = 'AUMENTO_GRADUAL';
           intervalSplit = 0.25;
           easySplit = 0.40;
           longSplit = 0.35;
+          cycleWeekName = 'Semana 3: Pico de Carga';
           rationale = 'Semana 3 do Ciclo: Semana de maior exigência física, combinando tiros fortes e longão estendido.';
           break;
 
-        case 4: // Semana 4: Deload / Regenerativa (-15% a -20% volume para supercompensação)
+        case 4:
           targetVolume = Number((baseVolumeForCalc * 0.85).toFixed(2));
           strategy = 'MANUTENCAO';
           intervalSplit = 0.10;
           easySplit = 0.60;
           longSplit = 0.30;
+          cycleWeekName = 'Semana 4: Deload / Regenerativa';
           rationale = 'Semana 4 (Deload): Redução planejada de volume para assimilação de carga, descanso tecidual e supercompensação.';
           break;
       }
@@ -164,6 +171,8 @@ export class TrainingPlanService {
       recommendedVolumeKm: targetVolume,
       strategy,
       rationale,
+      cycleWeekNumber,
+      cycleWeekName,
       sessions,
     };
   }
