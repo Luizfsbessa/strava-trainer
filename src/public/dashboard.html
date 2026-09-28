@@ -353,14 +353,16 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
+            // Ajuste dinâmico proporcional baseado na progressão da rodagem da semana anterior (dynamicTargetKm)
             let calculatedDist = s.suggestedDist;
             if (dynamicTargetKm) {
-              if (s.dayOfWeek.includes('Sábado') || (s.sessionType && s.sessionType.includes('Longo'))) {
-                calculatedDist = `${(dynamicTargetKm * 0.45).toFixed(1)} km`;
-              } else if (s.sessionType && (s.sessionType.includes('Intervalado') || s.sessionType.includes('Tiros'))) {
-                calculatedDist = `${(dynamicTargetKm * 0.25).toFixed(1)} km`;
+              const sTypeLower = (s.sessionType || '').toLowerCase();
+              if (s.dayOfWeek.includes('Sábado') || sTypeLower.includes('longo') || sTypeLower.includes('longão')) {
+                calculatedDist = `${(dynamicTargetKm * 0.40).toFixed(1)} km`; // ~40% no treino longo
+              } else if (sTypeLower.includes('intervalado') || sTypeLower.includes('tiros') || sTypeLower.includes('ritmo')) {
+                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`; // ~30% no treino de qualidade/intensidade
               } else {
-                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
+                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`; // ~30% restante na rodagem leve/regenerativa
               }
             }
 
