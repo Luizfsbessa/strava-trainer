@@ -202,27 +202,24 @@
       const titleEl = document.getElementById('cycle-main-title');
       let currentGoal = "Progresso Geral e Condicionamento";
 
-      try {
-        // Usa a rota correta '/init' que o sistema utiliza para inicializar os dados
-        const response = await fetch('/init');
-        if (response.ok) {
-          const initData = await response.json();
-          console.log("Dados de inicialização recebidos:", initData);
-          
-          // Pega o objetivo de treino do objeto retornado (ajustando para a estrutura do init)
-          const athlete = initData.profile || initData.user || initData;
-          currentGoal = athlete.trainingGoal || 
-                        athlete.training_goal || 
-                        athlete.objective || 
-                        athlete.goal || 
-                        athlete.meta || 
-                        currentGoal;
+      // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
+      const savedObjective = localStorage.getItem('user_objective');
+      if (savedObjective) {
+        currentGoal = savedObjective;
+      } else {
+        // 2. Fallback caso esteja no estado geral do app
+        try {
+          const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+          if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
+            currentGoal = appState.profile.objectiveText || appState.profile.objective;
+          }
+        } catch (e) {
+          console.warn('Erro ao ler estado do localStorage:', e);
         }
-      } catch (e) {
-        console.warn('Erro ao buscar dados do servidor:', e);
       }
 
       if (titleEl) {
+        // Garante que o texto fique limpo e exiba a meta configurada
         titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
       }
 
