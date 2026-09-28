@@ -203,19 +203,26 @@
       let currentGoal = "Progresso Geral e Condicionamento";
 
       try {
-        const response = await fetch('/api/profile');
+        // Usa a rota correta '/status' que o seu dashboard já consome com sucesso
+        const response = await fetch('/status');
         if (response.ok) {
-          const profileData = await response.json();
-          console.log("Dados do Perfil recebidos da API:", profileData); // Ajuda a inspecionar no F12 se necessário
+          const statusData = await response.json();
+          console.log("Dados de status recebidos da API:", statusData);
           
-          // Varre todas as chaves possíveis que o backend pode usar para o objetivo
-          currentGoal = profileData.trainingGoal || profileData.objective || profileData.meta || profileData.goal || profileData.target || currentGoal;
+          // Pega o objetivo de treino de dentro do objeto de status/perfil retornado
+          currentGoal = statusData.trainingGoal || 
+                        statusData.objective || 
+                        statusData.goal || 
+                        statusData.meta || 
+                        statusData.target || 
+                        currentGoal;
         }
       } catch (e) {
-        console.warn('Erro ao buscar perfil do servidor:', e);
+        console.warn('Erro ao buscar status do servidor:', e);
       }
 
       if (titleEl) {
+        // Formata bonitinho mantendo o padrão visual
         titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
       }
 
