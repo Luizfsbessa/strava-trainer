@@ -288,11 +288,15 @@
         const multiplier = objectiveConfig.multiplier;
         const objectiveCustomText = objectiveConfig.text;
 
+        // Correção rigorosa do intervalo de semanas e do cálculo dinâmico com base na semana anterior
         const now = new Date();
-        const dayOfWeek = now.getDay();
-        const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        now.setHours(0, 0, 0, 0);
         
-        const startOfCurrentWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
+        const dayOfWeek = now.getDay();
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        
+        const startOfCurrentWeek = new Date(now);
+        startOfCurrentWeek.setDate(now.getDate() + diffToMonday);
         startOfCurrentWeek.setHours(0, 0, 0, 0);
 
         const endOfCurrentWeek = new Date(startOfCurrentWeek);
@@ -310,7 +314,9 @@
         const previousWeekKm = workouts
           .filter(w => {
             const isRun = (!w.type || w.type === 'corrida');
-            const wDate = new Date(w.activityDate || w.date);
+            const wDateStr = w.activityDate || w.date;
+            if (!wDateStr) return false;
+            const wDate = new Date(wDateStr);
             return isRun && wDate >= startOfPreviousWeek && wDate <= endOfPreviousWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
@@ -318,12 +324,15 @@
         const currentWeekKm = workouts
           .filter(w => {
             const isRun = (!w.type || w.type === 'corrida');
-            const wDate = new Date(w.activityDate || w.date);
+            const wDateStr = w.activityDate || w.date;
+            if (!wDateStr) return false;
+            const wDate = new Date(wDateStr);
             return isRun && wDate >= startOfCurrentWeek && wDate <= endOfCurrentWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        const dynamicTargetKm = previousWeekKm > 0 ? (previousWeekKm * multiplier) : (objectiveConfig.targetVolume || 23.33);
+        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : (objectiveConfig.targetVolume || 23.33);
+        const dynamicTargetKm = baseVolForProgression * multiplier;
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
@@ -353,16 +362,15 @@
           if (s.isRun) {
             const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
             
-            // Ajuste dinâmico proporcional baseado na progressão da rodagem da semana anterior (dynamicTargetKm)
             let calculatedDist = s.suggestedDist;
             if (dynamicTargetKm) {
               const sTypeLower = (s.sessionType || '').toLowerCase();
               if (s.dayOfWeek.includes('Sábado') || sTypeLower.includes('longo') || sTypeLower.includes('longão')) {
-                calculatedDist = `${(dynamicTargetKm * 0.40).toFixed(1)} km`; // ~40% no treino longo
+                calculatedDist = `${(dynamicTargetKm * 0.40).toFixed(1)} km`;
               } else if (sTypeLower.includes('intervalado') || sTypeLower.includes('tiros') || sTypeLower.includes('ritmo')) {
-                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`; // ~30% no treino de qualidade/intensidade
+                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
               } else {
-                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`; // ~30% restante na rodagem leve/regenerativa
+                calculatedDist = `${(dynamicTargetKm * 0.30).toFixed(1)} km`;
               }
             }
 
