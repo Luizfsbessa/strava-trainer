@@ -98,7 +98,7 @@
     .card:hover { border-color: var(--border-glow); transform: translateY(-1px); }
     .day { font-weight: 700; color: var(--accent-blue); text-transform: uppercase; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
     .type { font-size: 15px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
-    .desc { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+    .desc { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
     
     .workout-details { 
       display: flex; 
@@ -415,7 +415,7 @@
             `;
           }
 
-          // Monta a estruturação de blocos (tiros, aquecimento, etc.) se houver
+          // Monta a estruturação de blocos passo a passo se houver
           let structuredHtml = '';
           if (s.steps && s.steps.length > 0) {
             const stepsRows = s.steps.map(step => `
@@ -433,6 +433,7 @@
             `;
           }
 
+          // ORDEM APLICADA: Descrição curta > Detalhes Gerais > Detalhamento (Passo a Passo)
           return `
             <div class="card">
               <div class="day">${s.dayOfWeek}</div>
@@ -441,10 +442,8 @@
                 <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
               </div>
               <div class="desc">${s.description}</div>
+              ${s.isRun ? `<div class="workout-details">${detailsHtml}</div>` : ''}
               ${structuredHtml}
-              <div class="workout-details">
-                ${detailsHtml}
-              </div>
               ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">▶ YouTube: ${s.videoSearchTerm}</a>` : ''}
             </div>
           `;
@@ -488,11 +487,9 @@
       return `${formatPace(baseSecs * minMultiplier)} - ${formatPace(baseSecs * maxMultiplier)} /km`;
     }
 
-    // MATRIZ DE OBJETIVOS COM ESTRUTURAÇÃO DETALHADA DE TIROS E LIMIAR
     function getObjectiveMatrix(objective) {
       const objStr = String(objective || "").toLowerCase();
 
-      // 1. Meta: 5 km
       if (objStr.includes("5 km") || objStr.includes("5km")) {
         return {
           text: "Meta: 5 km (Velocidade)",
@@ -526,7 +523,6 @@
           }
         };
       } 
-      // 2. Meta: 10 km
       else if (objStr.includes("10 km") || objStr.includes("10km")) {
         return {
           text: "Meta: 10 km (Resistência & Pace)",
@@ -560,7 +556,6 @@
           }
         };
       } 
-      // 3. Meia Maratona (21.1 km)
       else if (objStr.includes("meia maratona") || objStr.includes("21.1")) {
         return {
           text: "Meia Maratona (21.1 km)",
@@ -594,7 +589,6 @@
           }
         };
       } 
-      // 4. Maratona Completa (42.2 km)
       else if (objStr.includes("maratona")) {
         return {
           text: "Meta: Maratona / Longão Extendido",
@@ -621,7 +615,6 @@
           }
         };
       } 
-      // Padrão / Perda de Peso Progressiva
       else {
         return {
           text: "Perda de Peso Progressiva",
