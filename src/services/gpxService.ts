@@ -39,13 +39,14 @@ export class GpxService {
     }
 
     const splits: any[] = [];
+
+    // 1. Tenta buscar tags <lap> nativas via Regex
     const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
     let lapMatch;
     let lapIndex = 1;
 
     while ((lapMatch = lapRegex.exec(gpxString)) !== null) {
       const lapContent = lapMatch[1];
-      
       const distMatch = /<distance>(.*?)<\/distance>/i.exec(lapContent);
       const durMatch = /<duration>(.*?)<\/duration>/i.exec(lapContent) || /<time>(.*?)<\/time>/i.exec(lapContent);
 
@@ -72,7 +73,52 @@ export class GpxService {
       });
     }
 
-    // Se o GPX não tiver tags <lap>, criamos blocos de 1km como fallback seguro
+    // 2. Se não houver <lap>, verifica se o GPX possui múltiplos segmentos (<trkseg>),
+    // que é o formato onde o relógio separa blocos/tiros sem usar a tag lap explícita.
+    const trackAny = track as any;
+    if (splits.length === 0 && trackAny.segments && trackAny.segments.length > 1) {
+      trackAny.segments.forEach((segPoints: any[], segIdx: number) => {
+        let segDistMeters = 0;
+        let segSecs = 0;
+        let segPrev: any = null;
+
+        segPoints.forEach(p => {
+          if (segPrev) {
+            const dist = GpxService.haversineDistance(segPrev.lat, segPrev.lon, p.lat, p.lon);
+            if (dist > 0.5 && dist < 30) {
+              segDistMeters += dist;
+              if (segPrev.time && p.time) {
+                const diff = (new Date(p.time).getTime() - new Date(segPrev.time).getTime()) / 1000;
+                if (diff > 0 && diff < 60) segSecs += diff;
+              }
+            }
+          }
+          segPrev = p;
+        });
+
+        const segDistKm = segDistMeters / 1000;
+        if (segDistKm > 0.02) { // Ignora blocos microscópicos de ruído
+          const lMin = Math.floor(segSecs / 60);
+          const lSec = Math.round(segSecs % 60);
+          let segPace = '00:00';
+          if (segDistKm > 0 && segSecs > 0) {
+            const secPerKm = segSecs / segDistKm;
+            const pMin = Math.floor(secPerKm / 60);
+            const pSec = Math.round(secPerKm % 60);
+            segPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
+          }
+
+          splits.push({
+            lap_index: segIdx + 1,
+            distance_km: Number(segDistKm.toFixed(2)),
+            moving_time_formatted: `${lMin < 10 ? '0' : ''}${lMin}:${lSec < 10 ? '0' : ''}${lSec}`,
+            pace: segPace
+          });
+        }
+      });
+    }
+
+    // 3. Fallback final por KM caso seja uma trilha contínua sem nenhum marcador
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
