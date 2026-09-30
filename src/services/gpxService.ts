@@ -40,11 +40,11 @@ export class GpxService {
     }
 
     const splits: any[] = [];
-    const gpxAny = gpx as any; // Cast para any para evitar erros de tipagem do gpxparser
+    const trackAny = track as any;
 
-    // 2. VERIFICA SE O GPX TEM LAPS NATIVOS (Voltas marcadas pelo relógio)
-    if (gpxAny.laps && gpxAny.laps.length > 0) {
-      gpxAny.laps.forEach((lap: any, index: number) => {
+    // 2. VERIFICA SE A TRACK TEM LAPS NATIVOS (Voltas gravadas pelo relógio, ex: 500m, aquecimentos, etc.)
+    if (trackAny.laps && trackAny.laps.length > 0) {
+      trackAny.laps.forEach((lap: any, index: number) => {
         const lapDistKm = lap.distance ? lap.distance / 1000 : 0;
         const lapSecs = lap.duration || 0;
         
@@ -67,7 +67,7 @@ export class GpxService {
         });
       });
     } else {
-      // 3. Fallback: Se o GPX não tiver laps gravados, fazemos a quebra automática por km
+      // 3. Fallback caso o GPX venha cru sem nenhum lap gravado
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
       let splitIndex = 1;
