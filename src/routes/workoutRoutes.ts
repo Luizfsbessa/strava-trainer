@@ -80,9 +80,9 @@ router.get('/strava/laps/:activityId', async (req, res) => {
       return res.status(404).json({ error: 'Treino não encontrado.' });
     }
 
-    // Se o treino foi importado via GPX mas o cache limpou, podemos simular os tiros reais baseados na distância e variação coerente, 
-    // ou se preferir guardar o JSON no campo `type` do banco para persistir entre reboots:
     const wAny = workout as any;
+    
+    // PRIMEIRO: Tenta ler do campo type onde guardamos o JSON dos laps do GPX
     if (wAny.type && wAny.type.startsWith('[')) {
       try {
         const parsedLaps = JSON.parse(wAny.type);
@@ -91,11 +91,11 @@ router.get('/strava/laps/:activityId', async (req, res) => {
           return res.json(parsedLaps);
         }
       } catch (e) {
-        // ignora erro de parse se não for json
+        // ignora se falhar o parse
       }
     }
 
-    // Fallback caso não tenha laps guardados
+    // Se chegou aqui e não tem laps salvos, aí sim faz o fallback por km
     const totalDist = Number(workout.distanceKm || 0);
     const totalSecs = Number(wAny.moving_time_sec || (workout.durationMinutes ? workout.durationMinutes * 60 : 0));
 

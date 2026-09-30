@@ -23,7 +23,7 @@ export class GpxService {
       const p = validPoints[i];
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-        if (dist >.5 && dist < 30) {
+        if (dist > 0.5 && dist < 30) {
           totalDistanceMeters += dist;
           if (lastPoint.time && p.time) {
             const t1 = new Date(lastPoint.time).getTime();
@@ -39,8 +39,6 @@ export class GpxService {
     }
 
     const splits: any[] = [];
-
-    // Extração direta via Regex das tags <lap> do XML do GPX (garante que pega as voltas reais do relógio)
     const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
     let lapMatch;
     let lapIndex = 1;
@@ -49,19 +47,11 @@ export class GpxService {
       const lapContent = lapMatch[1];
       
       const distMatch = /<distance>(.*?)<\/distance>/i.exec(lapContent);
-      const timeMatch = /<time>(.*?)<\/time>/i.exec(lapContent); // ou duration dependendo do fabricante
-      const durMatch = /<duration>(.*?)<\/duration>/i.exec(lapContent) || /<totalthandle?>.*?<\/totalthandle?>/i.exec(lapContent);
+      const durMatch = /<duration>(.*?)<\/duration>/i.exec(lapContent) || /<time>(.*?)<\/time>/i.exec(lapContent);
 
       const lapDistMeters = distMatch ? parseFloat(distMatch[1]) : 0;
       const lapDistKm = lapDistMeters / 1000;
-
-      // Se o relógio não mandou o tempo direto no lap, tentamos estimar pelos pontos ou segundos
-      let lapSecs = durMatch ? parseFloat(durMatch[1]) : 0;
-
-      // Fallback de tempo caso a tag duration venha vazia
-      if (!lapSecs && timeMatch) {
-        // Se houver controle de tempo interno
-      }
+      const lapSecs = durMatch ? parseFloat(durMatch[1]) : 0;
 
       const lapMin = Math.floor(lapSecs / 60);
       const lapSec = Math.round(lapSecs % 60);
@@ -82,7 +72,7 @@ export class GpxService {
       });
     }
 
-    // Se o arquivo GPX não tiver nenhuma tag <lap> explícita, mantemos o fallback por km
+    // Se o GPX não tiver tags <lap>, criamos blocos de 1km como fallback seguro
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
