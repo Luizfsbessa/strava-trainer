@@ -1,12 +1,7 @@
 import GpxParser from 'gpxparser';
 
 export class GpxService {
-  /**
-   * Processa o conteúdo de um arquivo GPX, aplicando filtro de ruído e cálculo preciso de voltas/splits.
-   * @param fileBuffer Buffer do arquivo GPX enviado.
-   * @param distanciaAlvoVoltaMeters Distância alvo de cada volta em metros (ex: 400 para pista, 1000 para padrão por km).
-   */
-  static parseGpxContent(fileBuffer: Buffer, distanciaAlvoVoltaMeters: number = 1000) {
+  static parseGpxContent(fileBuffer: Buffer) {
     const gpx = new GpxParser();
     const gpxString = fileBuffer.toString('utf8');
     gpx.parse(gpxString);
@@ -22,68 +17,103 @@ export class GpxService {
 
     let totalDistanceMeters = 0;
     let movingSeconds = 0;
-    const splits: any[] = [];
-
-    let currentSplitDist = 0;
-    let currentSplitSecs = 0;
-    let splitIndex = 1;
     let lastPoint: any = null;
 
+    // 1. Calcula a distância total real e o tempo total com base nos pontos (com filtro de ruído)
     for (let i = 0; i < validPoints.length; i++) {
       const p = validPoints[i];
-
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-
-        // Filtro de ruído: ignora micro-oscilações (< 0.5m) e teletransortes irreais (> 30m por segundo)
         if (dist > 0.5 && dist < 30) {
           totalDistanceMeters += dist;
-          currentSplitDist += dist;
-
           if (lastPoint.time && p.time) {
             const t1 = new Date(lastPoint.time).getTime();
             const t2 = new Date(p.time).getTime();
             const diffSecs = (t2 - t1) / 1000;
-
             if (diffSecs > 0 && diffSecs < 60) {
               movingSeconds += diffSecs;
-              currentSplitSecs += diffSecs;
             }
-          }
-
-          // Se completou a distância alvo da volta atual (ex: 400m ou 1000m)
-          while (currentSplitDist >= distanciaAlvoVoltaMeters) {
-            const lapMin = Math.floor(currentSplitSecs / 60);
-            const lapSec = Math.round(currentSplitSecs % 60);
-            const distanciaKmFormatada = Number((distanciaAlvoVoltaMeters / 1000).toFixed(2));
-
-            splits.push({
-              lap_index: splitIndex++,
-              distance_km: distanciaKmFormatada,
-              moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-              pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
-            });
-
-            currentSplitDist -= distanciaAlvoVoltaMeters;
-            // Proporção de tempo consumida para o excedente da volta
-            currentSplitSecs = 0; 
           }
         }
       }
       lastPoint = p;
     }
 
-    // Adiciona o resto final se sobrou fração significativa
-    if (currentSplitDist > 20) {
-      const remKm = currentSplitDist / 1000;
-      const lapMin = Math.floor(currentSplitSecs / 60);
-      const lapSec = Math.round(currentSplitSecs % 60);
-      splits.push({
-        lap_index: splitIndex,
-        distance_km: Number(remKm.toFixed(2)),
-        moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-        pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+    const splits: any[] = [];
+    const gpxAny = gpx as any; // Cast para any para evitar erros de tipagem do gpxparser
+
+    // 2. VERIFICA SE O GPX TEM LAPS NATIVOS (Voltas marcadas pelo relógio)
+    if (gpxAny.laps && gpxAny.laps.length > 0) {
+      gpxAny.laps.forEach((lap: any, index: number) => {
+        const lapDistKm = lap.distance ? lap.distance / 1000 : 0;
+        const lapSecs = lap.duration || 0;
+        
+        const lapMin = Math.floor(lapSecs / 60);
+        const lapSec = Math.round(lapSecs % 60);
+
+        let lapPace = '00:00';
+        if (lapDistKm > 0 && lapSecs > 0) {
+          const secPerKm = lapSecs / lapDistKm;
+          const pMin = Math.floor(secPerKm / 60);
+          const pSec = Math.round(secPerKm % 60);
+          lapPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
+        }
+
+        splits.push({
+          lap_index: index + 1,
+          distance_km: Number(lapDistKm.toFixed(2)),
+          moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+          pace: lapPace
+        });
       });
+    } else {
+      // 3. Fallback: Se o GPX não tiver laps gravados, fazemos a quebra automática por km
+      let currentSplitDist = 0;
+      let currentSplitSecs = 0;
+      let splitIndex = 1;
+      let prevPoint: any = null;
+
+      for (let i = 0; i < validPoints.length; i++) {
+        const p = validPoints[i];
+        if (prevPoint) {
+          const dist = GpxService.haversineDistance(prevPoint.lat, prevPoint.lon, p.lat, p.lon);
+          if (dist > 0.5 && dist < 30) {
+            currentSplitDist += dist;
+            if (prevPoint.time && p.time) {
+              const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
+              if (diffSecs > 0 && diffSecs < 60) {
+                currentSplitSecs += diffSecs;
+              }
+            }
+
+            while (currentSplitDist >= 1000) {
+              const lapMin = Math.floor(currentSplitSecs / 60);
+              const lapSec = Math.round(currentSplitSecs % 60);
+              splits.push({
+                lap_index: splitIndex++,
+                distance_km: 1.0,
+                moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+                pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+              });
+              currentSplitDist -= 1000;
+              currentSplitSecs = 0;
+            }
+          }
+        }
+        prevPoint = p;
+      }
+
+      if (currentSplitDist > 20) {
+        const remKm = currentSplitDist / 1000;
+        const lapMin = Math.floor(currentSplitSecs / 60);
+        const lapSec = Math.round(currentSplitSecs % 60);
+        splits.push({
+          lap_index: splitIndex,
+          distance_km: Number(remKm.toFixed(2)),
+          moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+          pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+        });
+      }
     }
 
     const distanceKm = totalDistanceMeters > 0 ? Number((totalDistanceMeters / 1000).toFixed(2)) : 0;
