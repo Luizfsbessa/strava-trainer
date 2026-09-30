@@ -73,8 +73,7 @@ export class GpxService {
       });
     }
 
-    // 2. Se não houver <lap>, verifica se o GPX possui múltiplos segmentos (<trkseg>),
-    // que é o formato onde o relógio separa blocos/tiros sem usar a tag lap explícita.
+    // 2. Se não houver <lap>, verifica se o GPX possui múltiplos segmentos (<trkseg>)
     const trackAny = track as any;
     if (splits.length === 0 && trackAny.segments && trackAny.segments.length > 1) {
       trackAny.segments.forEach((segPoints: any[], segIdx: number) => {
@@ -97,7 +96,7 @@ export class GpxService {
         });
 
         const segDistKm = segDistMeters / 1000;
-        if (segDistKm > 0.02) { // Ignora blocos microscópicos de ruído
+        if (segDistKm > 0.02) {
           const lMin = Math.floor(segSecs / 60);
           const lSec = Math.round(segSecs % 60);
           let segPace = '00:00';
@@ -118,7 +117,70 @@ export class GpxService {
       });
     }
 
-    // 3. Fallback final por KM caso seja uma trilha contínua sem nenhum marcador
+    // 3. Deteta tiros/intervalos analisando pausas ou recuperações (> 15 segundos entre pontos)
+    if (splits.length === 0) {
+      let intervalSegments: any[] = [];
+      let currentSegPoints: any[] = [];
+
+      for (let i = 0; i < validPoints.length; i++) {
+        const p = validPoints[i];
+        currentSegPoints.push(p);
+
+        if (i > 0 && validPoints[i - 1].time && p.time) {
+          const diffSecs = (new Date(p.time).getTime() - new Date(validPoints[i - 1].time).getTime()) / 1000;
+          if (diffSecs > 15 && currentSegPoints.length > 10) {
+            intervalSegments.push([...currentSegPoints]);
+            currentSegPoints = [p];
+          }
+        }
+      }
+      if (currentSegPoints.length > 0) {
+        intervalSegments.push(currentSegPoints);
+      }
+
+      if (intervalSegments.length > 1) {
+        intervalSegments.forEach((segPts, sIdx) => {
+          let segDist = 0;
+          let segSecs = 0;
+          let prev: any = null;
+          segPts.forEach(pt => {
+            if (prev) {
+              const d = GpxService.haversineDistance(prev.lat, prev.lon, pt.lat, pt.lon);
+              if (d > 0.5 && d < 30) {
+                segDist += d;
+                if (prev.time && pt.time) {
+                  const tDiff = (new Date(pt.time).getTime() - new Date(prev.time).getTime()) / 1000;
+                  if (tDiff > 0 && tDiff < 60) segSecs += tDiff;
+                }
+              }
+            }
+            prev = pt;
+          });
+
+          const distKm = segDist / 1000;
+          if (distKm > 0.05) {
+            const m = Math.floor(segSecs / 60);
+            const s = Math.round(segSecs % 60);
+            let paceStr = '00:00';
+            if (distKm > 0 && segSecs > 0) {
+              const spk = segSecs / distKm;
+              const pm = Math.floor(spk / 60);
+              const ps = Math.round(spk % 60);
+              paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps} /km`;
+            }
+
+            splits.push({
+              lap_index: sIdx + 1,
+              distance_km: Number(distKm.toFixed(2)),
+              moving_time_formatted: `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`,
+              pace: paceStr
+            });
+          }
+        });
+      }
+    }
+
+    // 4. Fallback final por KM caso nenhum critério anterior se aplique
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
