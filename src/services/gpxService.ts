@@ -1,7 +1,12 @@
 import GpxParser from 'gpxparser';
 
 export class GpxService {
-  static parseGpxContent(fileBuffer: Buffer) {
+  /**
+   * Processa o conteúdo de um arquivo GPX, aplicando filtro de ruído e cálculo preciso de voltas/splits.
+   * @param fileBuffer Buffer do arquivo GPX enviado.
+   * @param distanciaAlvoVoltaMeters Distância alvo de cada volta em metros (ex: 400 para pista, 1000 para padrão por km).
+   */
+  static parseGpxContent(fileBuffer: Buffer, distanciaAlvoVoltaMeters: number = 1000) {
     const gpx = new GpxParser();
     const gpxString = fileBuffer.toString('utf8');
     gpx.parse(gpxString);
@@ -29,39 +34,47 @@ export class GpxService {
 
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-        totalDistanceMeters += dist;
-        currentSplitDist += dist;
 
-        if (lastPoint.time && p.time) {
-          const t1 = new Date(lastPoint.time).getTime();
-          const t2 = new Date(p.time).getTime();
-          const diffSecs = (t2 - t1) / 1000;
+        // Filtro de ruído: ignora micro-oscilações (< 0.5m) e teletransortes irreais (> 30m por segundo)
+        if (dist > 0.5 && dist < 30) {
+          totalDistanceMeters += dist;
+          currentSplitDist += dist;
 
-          if (diffSecs > 0 && diffSecs < 15) {
-            movingSeconds += diffSecs;
-            currentSplitSecs += diffSecs;
+          if (lastPoint.time && p.time) {
+            const t1 = new Date(lastPoint.time).getTime();
+            const t2 = new Date(p.time).getTime();
+            const diffSecs = (t2 - t1) / 1000;
+
+            if (diffSecs > 0 && diffSecs < 60) {
+              movingSeconds += diffSecs;
+              currentSplitSecs += diffSecs;
+            }
           }
-        }
 
-        // Se completou 1 km na volta atual
-        if (currentSplitDist >= 1000) {
-          const lapMin = Math.floor(currentSplitSecs / 60);
-          const lapSec = Math.round(currentSplitSecs % 60);
-          splits.push({
-            lap_index: splitIndex++,
-            distance_km: 1.0,
-            moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-            pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
-          });
-          currentSplitDist -= 1000;
-          currentSplitSecs = 0;
+          // Se completou a distância alvo da volta atual (ex: 400m ou 1000m)
+          while (currentSplitDist >= distanciaAlvoVoltaMeters) {
+            const lapMin = Math.floor(currentSplitSecs / 60);
+            const lapSec = Math.round(currentSplitSecs % 60);
+            const distanciaKmFormatada = Number((distanciaAlvoVoltaMeters / 1000).toFixed(2));
+
+            splits.push({
+              lap_index: splitIndex++,
+              distance_km: distanciaKmFormatada,
+              moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+              pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+            });
+
+            currentSplitDist -= distanciaAlvoVoltaMeters;
+            // Proporção de tempo consumida para o excedente da volta
+            currentSplitSecs = 0; 
+          }
         }
       }
       lastPoint = p;
     }
 
-    // Adiciona o resto final se sobrou fração de km
-    if (currentSplitDist > 50) {
+    // Adiciona o resto final se sobrou fração significativa
+    if (currentSplitDist > 20) {
       const remKm = currentSplitDist / 1000;
       const lapMin = Math.floor(currentSplitSecs / 60);
       const lapSec = Math.round(currentSplitSecs % 60);
