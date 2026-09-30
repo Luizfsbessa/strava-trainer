@@ -114,7 +114,6 @@
     .workout-details span { color: var(--text-muted); }
     .workout-details strong { color: var(--text-main); }
 
-    /* ESTILO PARA OS BLOCOS ESTRUTURADOS DE TREINO */
     .structured-blocks {
       background: rgba(15, 23, 42, 0.8);
       border: 1px dashed rgba(56, 189, 248, 0.3);
@@ -334,18 +333,27 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
+        // CORREÇÃO APLICADA: Tratamento seguro de fuso horário e normalização de tipo
         const currentWeekKm = workouts
           .filter(w => {
-            const isRun = (!w.type || w.type === 'corrida');
+            const wType = String(w.type || 'corrida').toLowerCase();
+            const isRun = (wType === 'corrida' || wType === 'run');
             const wDateStr = w.activityDate || w.date;
             if (!wDateStr) return false;
-            const wDate = new Date(wDateStr);
+            
+            const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
+            const wDate = new Date(year, month - 1, day);
+            wDate.setHours(0, 0, 0, 0);
+
             return isRun && wDate >= startOfCurrentWeek && wDate <= endOfCurrentWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
         const sortedRuns = workouts
-          .filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0)
+          .filter(w => {
+            const wType = String(w.type || 'corrida').toLowerCase();
+            return (wType === 'corrida' || wType === 'run') && (parseFloat(w.distanceKm || w.distance) || 0) > 0;
+          })
           .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
 
         let previousWeekKm = 0;
@@ -356,10 +364,15 @@
           
           previousWeekKm = workouts
             .filter(w => {
-              const isRun = (!w.type || w.type === 'corrida');
+              const wType = String(w.type || 'corrida').toLowerCase();
+              const isRun = (wType === 'corrida' || wType === 'run');
               const wDateStr = w.activityDate || w.date;
               if (!wDateStr) return false;
-              const wDate = new Date(wDateStr);
+
+              const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
+              const wDate = new Date(year, month - 1, day);
+              wDate.setHours(0, 0, 0, 0);
+
               return isRun && wDate >= windowStart && wDate <= latestDate;
             })
             .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
@@ -415,7 +428,6 @@
             `;
           }
 
-          // Monta a estruturação de blocos passo a passo se houver
           let structuredHtml = '';
           if (s.steps && s.steps.length > 0) {
             const stepsRows = s.steps.map(step => `
@@ -433,7 +445,6 @@
             `;
           }
 
-          // ORDEM APLICADA: Descrição curta > Detalhes Gerais > Detalhamento (Passo a Passo)
           return `
             <div class="card">
               <div class="day">${s.dayOfWeek}</div>
@@ -455,7 +466,10 @@
     }
 
     function calculateBasePace(workouts) {
-      const runs = workouts.filter(w => (!w.type || w.type === 'corrida') && (w.distanceKm || w.distance) > 0 && (w.durationMinutes || w.duration) > 0);
+      const runs = workouts.filter(w => {
+        const wType = String(w.type || 'corrida').toLowerCase();
+        return (wType === 'corrida' || wType === 'run') && (parseFloat(w.distanceKm || w.distance) || 0) > 0 && (parseFloat(w.durationMinutes || w.duration) || 0) > 0;
+      });
       if (runs.length === 0) return 420;
 
       let totalSecsPerKm = 0;
