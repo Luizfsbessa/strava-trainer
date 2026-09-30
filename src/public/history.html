@@ -449,42 +449,34 @@
 
       container.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 10px 0;">Carregando análise e voltas...</div>`;
 
-      const effectiveStravaId = stravaId && stravaId !== 'undefined' && stravaId !== 'null' ? stravaId : id;
+      // Busca a atividade atual diretamente no array global carregado do banco
+      const currentWorkout = globalWorkouts.find(w => String(w.id) === String(id));
+      const laps = currentWorkout?.laps || [];
 
       let lapsHtml = '';
-      if (effectiveStravaId) {
-        try {
-          const res = await fetch(`/api/workouts/strava/laps/${effectiveStravaId}`);
-          if (res.ok) {
-            const laps = await res.json();
-            if (Array.isArray(laps) && laps.length > 0) {
-              lapsHtml = `
-                <table class="laps-table">
-                  <thead>
-                    <tr>
-                      <th>Volta / Tiro</th>
-                      <th>Distância</th>
-                      <th>Tempo em Mov.</th>
-                      <th>Pace /km</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${laps.map(l => `
-                      <tr>
-                        <td><strong>Volta ${l.lap_index}</strong></td>
-                        <td>${l.distance_km} km</td>
-                        <td>${l.moving_time_formatted}</td>
-                        <td class="${l.pace < '6:00' ? 'fast-lap' : ''}">${l.pace}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              `;
-            }
-          }
-        } catch (e) {
-          console.log('Sem dados de laps do Strava:', e);
-        }
+      if (Array.isArray(laps) && laps.length > 0) {
+        lapsHtml = `
+          <table class="laps-table">
+            <thead>
+              <tr>
+                <th>Volta / Tiro</th>
+                <th>Distância</th>
+                <th>Tempo em Mov.</th>
+                <th>Pace /km</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${laps.map(l => `
+                <tr>
+                  <td><strong>Volta ${l.lap_index}</strong></td>
+                  <td>${l.distance_km} km</td>
+                  <td>${l.moving_time_formatted}</td>
+                  <td>${l.pace}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
       }
 
       let splitsHtml = '';
@@ -548,7 +540,7 @@
         </div>
         <div id="view-splits-${id}">${splitsHtml}</div>
         <div id="view-laps-${id}" style="display: none;">
-          ${lapsHtml || '<div style="color: var(--text-muted); font-size: 12px; padding: 10px 0;">Nenhuma volta manual/tiro registrado nesta atividade no Strava.</div>'}
+          ${lapsHtml || '<div style="color: var(--text-muted); font-size: 12px; padding: 10px 0;">Nenhuma volta ou segmento registrado neste GPX.</div>'}
         </div>
       `;
     }
