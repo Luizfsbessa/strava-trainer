@@ -220,15 +220,20 @@ router.get('/', async (req, res) => {
         paceFormatted = `${paceMin}:${paceSec < 10 ? '0' : ''}${paceSec} /km`;
       }
 
-      // Limpa o campo type se ele contiver o JSON dos laps para não quebrar a UI principal se ela esperar uma string de tipo
+      // Extrai os laps salvos em JSON no campo type e limpa o tipo para a UI
+      let parsedLaps = [];
       let displayType = w.type;
       if (displayType && displayType.startsWith('[')) {
+        try {
+          parsedLaps = JSON.parse(displayType);
+        } catch (e) {}
         displayType = 'run';
       }
 
       return {
         ...w,
         type: displayType,
+        laps: parsedLaps, // <-- Aqui está a propriedade que faltava chegar ao front-end!
         moving_time_sec: movingSecs,
         durationMinutes: durationMin,
         calculatedPace: paceFormatted,
