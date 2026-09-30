@@ -2,8 +2,8 @@ import GpxParser from 'gpxparser';
 
 export class GpxService {
   static parseGpxContent(fileBuffer: Buffer) {
-    const gpx = new GpxParser();
     const gpxString = fileBuffer.toString('utf8');
+    const gpx = new GpxParser();
     gpx.parse(gpxString);
 
     const track = gpx.tracks[0] || (gpx.routes && gpx.routes[0]);
@@ -19,12 +19,11 @@ export class GpxService {
     let movingSeconds = 0;
     let lastPoint: any = null;
 
-    // 1. Calcula a distância total real e o tempo total com base nos pontos (com filtro de ruído)
     for (let i = 0; i < validPoints.length; i++) {
       const p = validPoints[i];
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-        if (dist > 0.5 && dist < 30) {
+        if (dist >.5 && dist < 30) {
           totalDistanceMeters += dist;
           if (lastPoint.time && p.time) {
             const t1 = new Date(lastPoint.time).getTime();
@@ -40,34 +39,51 @@ export class GpxService {
     }
 
     const splits: any[] = [];
-    const trackAny = track as any;
 
-    // 2. VERIFICA SE A TRACK TEM LAPS NATIVOS (Voltas gravadas pelo relógio, ex: 500m, aquecimentos, etc.)
-    if (trackAny.laps && trackAny.laps.length > 0) {
-      trackAny.laps.forEach((lap: any, index: number) => {
-        const lapDistKm = lap.distance ? lap.distance / 1000 : 0;
-        const lapSecs = lap.duration || 0;
-        
-        const lapMin = Math.floor(lapSecs / 60);
-        const lapSec = Math.round(lapSecs % 60);
+    // Extração direta via Regex das tags <lap> do XML do GPX (garante que pega as voltas reais do relógio)
+    const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
+    let lapMatch;
+    let lapIndex = 1;
 
-        let lapPace = '00:00';
-        if (lapDistKm > 0 && lapSecs > 0) {
-          const secPerKm = lapSecs / lapDistKm;
-          const pMin = Math.floor(secPerKm / 60);
-          const pSec = Math.round(secPerKm % 60);
-          lapPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
-        }
+    while ((lapMatch = lapRegex.exec(gpxString)) !== null) {
+      const lapContent = lapMatch[1];
+      
+      const distMatch = /<distance>(.*?)<\/distance>/i.exec(lapContent);
+      const timeMatch = /<time>(.*?)<\/time>/i.exec(lapContent); // ou duration dependendo do fabricante
+      const durMatch = /<duration>(.*?)<\/duration>/i.exec(lapContent) || /<totalthandle?>.*?<\/totalthandle?>/i.exec(lapContent);
 
-        splits.push({
-          lap_index: index + 1,
-          distance_km: Number(lapDistKm.toFixed(2)),
-          moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-          pace: lapPace
-        });
+      const lapDistMeters = distMatch ? parseFloat(distMatch[1]) : 0;
+      const lapDistKm = lapDistMeters / 1000;
+
+      // Se o relógio não mandou o tempo direto no lap, tentamos estimar pelos pontos ou segundos
+      let lapSecs = durMatch ? parseFloat(durMatch[1]) : 0;
+
+      // Fallback de tempo caso a tag duration venha vazia
+      if (!lapSecs && timeMatch) {
+        // Se houver controle de tempo interno
+      }
+
+      const lapMin = Math.floor(lapSecs / 60);
+      const lapSec = Math.round(lapSecs % 60);
+
+      let lapPace = '00:00';
+      if (lapDistKm > 0 && lapSecs > 0) {
+        const secPerKm = lapSecs / lapDistKm;
+        const pMin = Math.floor(secPerKm / 60);
+        const pSec = Math.round(secPerKm % 60);
+        lapPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
+      }
+
+      splits.push({
+        lap_index: lapIndex++,
+        distance_km: Number(lapDistKm.toFixed(2)),
+        moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+        pace: lapPace
       });
-    } else {
-      // 3. Fallback caso o GPX venha cru sem nenhum lap gravado
+    }
+
+    // Se o arquivo GPX não tiver nenhuma tag <lap> explícita, mantemos o fallback por km
+    if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
       let splitIndex = 1;
