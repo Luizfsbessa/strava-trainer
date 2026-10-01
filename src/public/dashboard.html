@@ -302,6 +302,7 @@
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         const rawProfile = data.profile || {};
+        const activeCycle = data.activeCycle || null; // Objeto de ciclo vindo do servidor
         
         const storedWeight = localStorage.getItem('user_current_weight');
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
@@ -333,7 +334,7 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // Tratamento seguro de fuso horário e normalização de tipo
+        // Tratamento seguro do volume semanal
         const currentWeekKm = workouts
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
@@ -380,20 +381,35 @@
 
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : 23.33;
         
-        // --- ATUALIZAÇÃO DO CÁLCULO DA SEMANA BASEADA NO CALENDÁRIO (SEGUNDA A DOMINGO) ---
-        const mondayCurrentWeek = new Date(now);
-        mondayCurrentWeek.setDate(now.getDate() + diffToMonday);
+        // --- CÁLCULO DINÂMICO DA SEMANA BASEADO NA DATA DE REGISTRO / INÍCIO DO CICLO ---
+        let cycleStartDate;
+        if (activeCycle && activeCycle.startDate) {
+          cycleStartDate = new Date(activeCycle.startDate);
+        } else if (sortedRuns.length > 0) {
+          // Se não houver ciclo explícito no payload, pega a data do registro da atividade mais recente
+          cycleStartDate = new Date(sortedRuns[0].activityDate || sortedRuns[0].date);
+        } else {
+          cycleStartDate = new Date();
+        }
 
-        const dayOfMonthMonday = mondayCurrentWeek.getDate();
-        const cycleWeekNumber = Math.min(4, Math.max(1, Math.ceil(dayOfMonthMonday / 7)));
+        cycleStartDate.setHours(0, 0, 0, 0);
+        const startDay = cycleStartDate.getDay();
+        const diffStartToMonday = startDay === 0 ? -6 : 1 - startDay;
+        const cycleBaseMonday = new Date(cycleStartDate);
+        cycleBaseMonday.setDate(cycleStartDate.getDate() + diffStartToMonday);
+
+        const diffInDays = Math.max(0, Math.floor((now - cycleBaseMonday) / (1000 * 60 * 60 * 24)));
+        const weekIndex = Math.floor(diffInDays / 7);
+
+        const cycleWeekNumber = (weekIndex % 4) + 1;
 
         let cycleMultiplier = 1.05;
         let cycleWeekName = '';
 
         switch (cycleWeekNumber) {
-          case 1: cycleMultiplier = 1.05; cycleWeekName = 'Semana 1: Base e Construção'; break;
+          case 1: cycleMultiplier = 1.00; cycleWeekName = 'Semana 1: Base e Construção'; break;
           case 2: cycleMultiplier = 1.05; cycleWeekName = 'Semana 2: Ritmo e Densidade'; break;
-          case 3: cycleMultiplier = 1.05; cycleWeekName = 'Semana 3: Pico de Carga'; break;
+          case 3: cycleMultiplier = 1.10; cycleWeekName = 'Semana 3: Pico de Carga'; break;
           case 4: cycleMultiplier = 0.85; cycleWeekName = 'Semana 4: Deload / Regenerativa'; break;
         }
 
