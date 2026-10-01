@@ -333,7 +333,7 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // CORREÇÃO APLICADA: Tratamento seguro de fuso horário e normalização de tipo
+        // Tratamento seguro de fuso horário e normalização de tipo
         const currentWeekKm = workouts
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
@@ -380,7 +380,13 @@
 
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : 23.33;
         
-        const cycleWeekNumber = (Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 4) + 1;
+        // --- ATUALIZAÇÃO DO CÁLCULO DA SEMANA BASEADA NO CALENDÁRIO (SEGUNDA A DOMINGO) ---
+        const mondayCurrentWeek = new Date(now);
+        mondayCurrentWeek.setDate(now.getDate() + diffToMonday);
+
+        const dayOfMonthMonday = mondayCurrentWeek.getDate();
+        const cycleWeekNumber = Math.min(4, Math.max(1, Math.ceil(dayOfMonthMonday / 7)));
+
         let cycleMultiplier = 1.05;
         let cycleWeekName = '';
 
