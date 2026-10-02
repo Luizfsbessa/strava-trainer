@@ -102,7 +102,7 @@
     </div>
 
     <div class="card">
-      <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">⚡ Suas Zonas de Frequência Cardíaca</div>
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">⚡ Suas Zonas de Frequência Cardíaca e Ritmo Estimado</div>
       <div id="fcmax-subtitle" style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Calculando com base na data de nascimento...</div>
       <table class="zones-table">
         <thead>
@@ -111,6 +111,7 @@
             <th>Intensidade</th>
             <th>% da FCMax</th>
             <th>BPM Estimado</th>
+            <th>Pace Estimado</th>
             <th>Objetivo</th>
           </tr>
         </thead>
@@ -134,16 +135,59 @@
       return age;
     }
 
-    function updateZonesTable(age) {
+    function updateZonesTable(age, basePaceSeconds = 442) { // 442s = 7:22/km
       const fcMax = 220 - age;
       document.getElementById('fcmax-subtitle').innerText = `Baseado na sua idade (${age} anos) • FCMax estimada: ${fcMax} bpm (Fórmula: 220 - idade)`;
 
+      // Função auxiliar para formatar segundos em MM:SS
+      const formatPace = (sec) => {
+        if (sec <= 0) return "0:00";
+        const m = Math.floor(sec / 60);
+        const s = Math.round(sec % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+      };
+
       const zones = [
-        { name: 'Z1', label: 'Regenerativo / Muito Leve', pct: '50% - 60%', color: '#38bdf8', goal: 'Recuperação ativa' },
-        { name: 'Z2', label: 'Aeróbico / Queima de Gordura', pct: '60% - 70%', color: '#10b981', goal: 'Base e longões' },
-        { name: 'Z3', label: 'Moderado / Ritmo Sustentado', pct: '70% - 80%', color: '#f59e0b', goal: 'Ritmo de prova' },
-        { name: 'Z4', label: 'Limiar Anaeróbico / Duro', pct: '80% - 90%', color: '#f97316', goal: 'Expansão de limiar' },
-        { name: 'Z5', label: 'VO2Max / Esforço Máximo', pct: '90% - 100%', color: '#ef4444', goal: 'Tiros e velocidade' }
+        { 
+          name: 'Z1', 
+          label: 'Regenerativo / Muito Leve', 
+          pct: '50% - 60%', 
+          color: '#38bdf8', 
+          goal: 'Recuperação ativa',
+          pace: `${formatPace(basePaceSeconds + 45)} - ${formatPace(basePaceSeconds + 90)} /km`
+        },
+        { 
+          name: 'Z2', 
+          label: 'Aeróbico / Queima de Gordura', 
+          pct: '60% - 70%', 
+          color: '#10b981', 
+          goal: 'Base e longões',
+          pace: `${formatPace(basePaceSeconds - 15)} - ${formatPace(basePaceSeconds + 15)} /km`
+        },
+        { 
+          name: 'Z3', 
+          label: 'Moderado / Ritmo Sustentado', 
+          pct: '70% - 80%', 
+          color: '#f59e0b', 
+          goal: 'Ritmo de prova',
+          pace: `${formatPace(basePaceSeconds - 45)} - ${formatPace(basePaceSeconds - 20)} /km`
+        },
+        { 
+          name: 'Z4', 
+          label: 'Limiar Anaeróbico / Duro', 
+          pct: '80% - 90%', 
+          color: '#f97316', 
+          goal: 'Expansão de limiar',
+          pace: `${formatPace(basePaceSeconds - 90)} - ${formatPace(basePaceSeconds - 50)} /km`
+        },
+        { 
+          name: 'Z5', 
+          label: 'VO2Max / Esforço Máximo', 
+          pct: '90% - 100%', 
+          color: '#ef4444', 
+          goal: 'Tiros e velocidade',
+          pace: `< ${formatPace(basePaceSeconds - 90)} /km`
+        }
       ];
 
       const tbody = document.getElementById('zones-tbody');
@@ -156,6 +200,7 @@
             <td><strong>${z.label}</strong></td>
             <td>${z.pct}</td>
             <td>${minBpm} - ${maxBpm} bpm</td>
+            <td style="font-weight: 600; color: var(--accent-blue);">${z.pace}</td>
             <td style="color: var(--text-muted);">${z.goal}</td>
           </tr>
         `;
@@ -191,12 +236,10 @@
         chartContainer.style.display = 'block';
         noDataMsg.style.display = 'none';
 
-        // Evita múltiplos registros do mesmo dia unificando pela data formatada (DD/MM/AAAA)
         const groupedData = {};
         history.forEach(item => {
           if (!item.date) return;
           const dateKey = new Date(item.date).toLocaleDateString('pt-BR');
-          // Mantém sempre o último registro ou o peso atualizado daquele dia
           groupedData[dateKey] = item.weight;
         });
 
@@ -243,6 +286,8 @@
     }
 
     async function loadProfile() {
+      let basePaceSec = 442; // Padrão 7:22 /km
+
       const saved = localStorage.getItem('strava_trainer_state');
       if (saved) {
         const data = JSON.parse(saved);
@@ -261,7 +306,12 @@
           document.getElementById('pTargetWeight').value = data.profile.targetWeight || 92.7;
           document.getElementById('pObjective').value = data.profile.objective || "perda_peso";
           
-          onBirthDateChange();
+          if (data.profile.basePaceSeconds) {
+            basePaceSec = data.profile.basePaceSeconds;
+          }
+
+          const calculatedAge = calculateAge(defaultBirth);
+          updateZonesTable(calculatedAge, basePaceSec);
         }
       }
 
@@ -271,6 +321,9 @@
           const apiData = await res.json();
           if (apiData.profile) {
             document.getElementById('pWeight').value = apiData.profile.weightKg;
+            if (apiData.profile.basePaceSeconds) {
+              basePaceSec = apiData.profile.basePaceSeconds;
+            }
             if (apiData.profile.age) {
               const currentYear = new Date().getFullYear();
               const estimatedYear = currentYear - apiData.profile.age;
@@ -278,7 +331,8 @@
                 document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
               }
             }
-            onBirthDateChange();
+            const currentAge = calculateAge(document.getElementById('pBirthDate').value);
+            updateZonesTable(currentAge, basePaceSec);
           }
         }
       } catch (e) {
@@ -298,7 +352,6 @@
       const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
       const ageVal = calculateAge(birthDateVal);
 
-      // Salva explicitamente no localStorage para o Dashboard puxar o texto formatado e a chave
       localStorage.setItem('user_objective', objectiveText);
 
       const saved = localStorage.getItem('strava_trainer_state');
