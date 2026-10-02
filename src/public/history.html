@@ -199,50 +199,58 @@
     }
 
     async function syncProfileCycleTitle() {
-      const titleEl = document.getElementById('cycle-main-title');
-      let currentGoal = "Progresso Geral e Condicionamento";
+    const titleEl = document.getElementById('cycle-main-title');
+    let currentGoal = "Progresso Geral e Condicionamento";
 
-      // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
-      const savedObjective = localStorage.getItem('user_objective');
-      if (savedObjective) {
-        currentGoal = savedObjective;
-      } else {
-        // 2. Fallback caso esteja no estado geral do app
-        try {
-          const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-          if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
-            currentGoal = appState.profile.objectiveText || appState.profile.objective;
-          }
-        } catch (e) {
-          console.warn('Erro ao ler estado do localStorage:', e);
+    // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
+    const savedObjective = localStorage.getItem('user_objective');
+    if (savedObjective) {
+      currentGoal = savedObjective;
+    } else {
+      // 2. Fallback caso esteja no estado geral do app
+      try {
+        const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+        if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
+          currentGoal = appState.profile.objectiveText || appState.profile.objective;
         }
-      }
-
-      if (titleEl) {
-        // Garante que o texto fique limpo e exiba a meta configurada
-        titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
-      }
-
-      // Cálculo da quilometragem dos últimos 7 dias para o progresso semanal
-      let totalKmWeek = 0;
-      const now = new Date();
-      const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-
-      globalWorkouts.forEach(w => {
-        const rawDate = w.activityDate || w.date;
-        if (rawDate) {
-          const wDate = new Date(rawDate);
-          if (wDate >= oneWeekAgo && wDate <= now) {
-            totalKmWeek += Number(w.distanceKm || w.distance || 0);
-          }
-        }
-      });
-
-      const realizedEl = document.getElementById('cycle-realized-km');
-      if (realizedEl) {
-        realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
+      } catch (e) {
+        console.warn('Erro ao ler estado do localStorage:', e);
       }
     }
+
+    if (titleEl) {
+      titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
+    }
+
+    // 3. Cálculo Unificado da Semana Atual (Segunda-feira até Domingo)
+    let totalKmWeek = 0;
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Segunda, ...
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek); // Ajusta para a Segunda da semana atual
+    
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    globalWorkouts.forEach(w => {
+      const rawDate = w.activityDate || w.date;
+      if (rawDate) {
+        const wDate = new Date(rawDate);
+        if (wDate >= monday && wDate <= sunday) {
+          totalKmWeek += Number(w.distanceKm || w.distance || 0);
+        }
+      }
+    });
+
+    const realizedEl = document.getElementById('cycle-realized-km');
+    if (realizedEl) {
+      realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
+    }
+  }
 
     async function loadHistory() {
       const container = document.getElementById('history-container');
