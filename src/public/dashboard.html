@@ -335,7 +335,7 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // Tratamento seguro do volume semanal
+        // Tratamento seguro do volume da semana atual
         const currentWeekKm = workouts
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
@@ -351,6 +351,36 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
+        // Cálculo da semana anterior encerrada
+        const startOfPreviousWeek = new Date(startOfCurrentWeek);
+        startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
+        const endOfPreviousWeek = new Date(startOfCurrentWeek);
+        endOfPreviousWeek.setMilliseconds(-1);
+
+        const previousWeekKm = workouts
+          .filter(w => {
+            const wType = String(w.type || 'corrida').toLowerCase();
+            const isRun = (wType === 'corrida' || wType === 'run');
+            const wDateStr = w.activityDate || w.date;
+            if (!wDateStr) return false;
+
+            const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
+            const wDate = new Date(year, month - 1, day);
+            wDate.setHours(0, 0, 0, 0);
+
+            return isRun && wDate >= startOfPreviousWeek && wDate <= endOfPreviousWeek;
+          })
+          .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
+
+        // A base é FIXA na semana anterior (ex: 24.4 km), impedindo o efeito bola de neve no decorrer da semana atual
+        const DEFAULT_INITIAL_KM = 20.0;
+        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
+        
+        // Fator fixo de incremento incremental (5% de ganho sobre a semana anterior)
+        const PROGRESSION_RATE = 1.05;
+
+        // --- CÁLCULO DINÂMICO DA SEMANA BASEADO NA DATA DE REGISTRO / INÍCIO DO CICLO ---
+        let cycleStartDate;
         const sortedRuns = workouts
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
@@ -358,36 +388,9 @@
           })
           .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
 
-        let previousWeekKm = 0;
-        if (sortedRuns.length > 0) {
-          const latestDate = new Date(sortedRuns[0].activityDate || sortedRuns[0].date);
-          const windowStart = new Date(latestDate);
-          windowStart.setDate(windowStart.getDate() - 7);
-          
-          previousWeekKm = workouts
-            .filter(w => {
-              const wType = String(w.type || 'corrida').toLowerCase();
-              const isRun = (wType === 'corrida' || wType === 'run');
-              const wDateStr = w.activityDate || w.date;
-              if (!wDateStr) return false;
-
-              const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
-              const wDate = new Date(year, month - 1, day);
-              wDate.setHours(0, 0, 0, 0);
-
-              return isRun && wDate >= windowStart && wDate <= latestDate;
-            })
-            .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
-        }
-
-        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : 23.33;
-        
-        // --- CÁLCULO DINÂMICO DA SEMANA BASEADO NA DATA DE REGISTRO / INÍCIO DO CICLO ---
-        let cycleStartDate;
         if (activeCycle && activeCycle.startDate) {
           cycleStartDate = new Date(activeCycle.startDate);
         } else if (sortedRuns.length > 0) {
-          // Se não houver ciclo explícito no payload, pega a data do registro da atividade mais recente
           cycleStartDate = new Date(sortedRuns[0].activityDate || sortedRuns[0].date);
         } else {
           cycleStartDate = new Date();
@@ -404,17 +407,17 @@
 
         const cycleWeekNumber = (weekIndex % 4) + 1;
 
-        let cycleMultiplier = 1.05;
         let cycleWeekName = '';
 
         switch (cycleWeekNumber) {
-          case 1: cycleMultiplier = 1.00; cycleWeekName = 'Semana 1: Base e Construção'; break;
-          case 2: cycleMultiplier = 1.05; cycleWeekName = 'Semana 2: Ritmo e Densidade'; break;
-          case 3: cycleMultiplier = 1.10; cycleWeekName = 'Semana 3: Pico de Carga'; break;
-          case 4: cycleMultiplier = 0.85; cycleWeekName = 'Semana 4: Deload / Regenerativa'; break;
+          case 1: cycleWeekName = 'Semana 1: Base e Construção'; break;
+          case 2: cycleWeekName = 'Semana 2: Ritmo e Densidade'; break;
+          case 3: cycleWeekName = 'Semana 3: Pico de Carga'; break;
+          case 4: cycleWeekName = 'Semana 4: Deload / Regenerativa'; break;
         }
 
-        const dynamicTargetKm = baseVolForProgression * cycleMultiplier * objectiveConfig.volumeMultiplier;
+        // Meta congelada e cravada para a semana corrente
+        const dynamicTargetKm = baseVolForProgression * PROGRESSION_RATE * objectiveConfig.volumeMultiplier;
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
