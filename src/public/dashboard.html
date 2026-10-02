@@ -256,13 +256,14 @@
               <label>Tipo de Atividade</label>
               <select id="workoutType" onchange="toggleManualFields()">
                 <option value="corrida">🏃‍♂️ Corrida</option>
+                <option value="musculacao">🏋️‍♂️ Musculação</option>
                 <option value="mobilidade">🧘‍♂️ Mobilidade</option>
                 <option value="educativo">⚡ Educativos</option>
               </select>
             </div>
             <div class="form-group">
               <label>Título / Descrição</label>
-              <input type="text" id="title" placeholder="Ex: Alongamento de quadril" required>
+              <input type="text" id="title" placeholder="Ex: Treino de Peito e Tríceps" required>
             </div>
             <div class="form-group" id="field-distance">
               <label>Distância (km)</label>
@@ -682,7 +683,7 @@
     function toggleManualFields() {
       const type = document.getElementById('workoutType').value;
       const distanceField = document.getElementById('field-distance');
-      distanceField.style.display = (type === 'mobilidade' || type === 'educativo') ? 'none' : 'block';
+      distanceField.style.display = (type === 'mobilidade' || type === 'educativo' || type === 'musculacao') ? 'none' : 'block';
     }
 
     async function submitWorkout(event) {
@@ -692,7 +693,7 @@
       
       const newWorkout = {
         title: document.getElementById('title').value,
-        distanceKm: type === 'mobilidade' || type === 'educativo' ? 0 : distance,
+        distanceKm: (type === 'mobilidade' || type === 'educativo' || type === 'musculacao') ? 0 : distance,
         durationMinutes: parseInt(document.getElementById('durationMinutes').value),
         activityDate: document.getElementById('activityDate').value,
         type: type
