@@ -152,7 +152,7 @@
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Foco configurado no perfil do atleta</div>
           </div>
           <div style="display: flex; gap: 20px; font-size: 13px;">
-            <span>Alvo Base: <strong>30.0 km</strong></span>
+            <span>Alvo Base: <strong id="cycle-target-km">25.6 km</strong></span>
             <span>Realizado: <strong id="cycle-realized-km" style="color: var(--accent-blue);">0.0 km</strong></span>
             <span style="color: var(--accent-gold);">Em Andamento</span>
           </div>
@@ -199,58 +199,71 @@
     }
 
     async function syncProfileCycleTitle() {
-    const titleEl = document.getElementById('cycle-main-title');
-    let currentGoal = "Progresso Geral e Condicionamento";
+      const titleEl = document.getElementById('cycle-main-title');
+      let currentGoal = "Progresso Geral e Condicionamento";
 
-    // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
-    const savedObjective = localStorage.getItem('user_objective');
-    if (savedObjective) {
-      currentGoal = savedObjective;
-    } else {
-      // 2. Fallback caso esteja no estado geral do app
+      // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
+      const savedObjective = localStorage.getItem('user_objective');
+      if (savedObjective) {
+        currentGoal = savedObjective;
+      } else {
+        // Fallback caso esteja no estado geral do app
+        try {
+          const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+          if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
+            currentGoal = appState.profile.objectiveText || appState.profile.objective;
+          }
+        } catch (e) {
+          console.warn('Erro ao ler estado do localStorage:', e);
+        }
+      }
+
+      if (titleEl) {
+        titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
+      }
+
+      // 2. Cálculo Unificado da Semana Atual (Segunda-feira até Domingo)
+      let totalKmWeek = 0;
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Segunda, ...
+      const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek); // Segunda-feira desta semana
+      
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      globalWorkouts.forEach(w => {
+        const rawDate = w.activityDate || w.date;
+        if (rawDate) {
+          const wDate = new Date(rawDate);
+          if (wDate >= monday && wDate <= sunday) {
+            totalKmWeek += Number(w.distanceKm || w.distance || 0);
+          }
+        }
+      });
+
+      const realizedEl = document.getElementById('cycle-realized-km');
+      if (realizedEl) {
+        realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
+      }
+
+      // 3. Sincronização Dinâmica do Volume Alvo (Meta)
       try {
         const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-        if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
-          currentGoal = appState.profile.objectiveText || appState.profile.objective;
+        const targetVolume = appState.targetVolume || appState.weeklyTargetKm || appState.calculatedTargetKm || 25.62;
+        
+        const targetEl = document.getElementById('cycle-target-km');
+        if (targetEl) {
+          targetEl.innerText = `${Number(targetVolume).toFixed(1)} km`;
         }
       } catch (e) {
-        console.warn('Erro ao ler estado do localStorage:', e);
+        console.warn('Erro ao ler volume alvo do estado:', e);
       }
     }
-
-    if (titleEl) {
-      titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
-    }
-
-    // 3. Cálculo Unificado da Semana Atual (Segunda-feira até Domingo)
-    let totalKmWeek = 0;
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Segunda, ...
-    const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek); // Ajusta para a Segunda da semana atual
-    
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    globalWorkouts.forEach(w => {
-      const rawDate = w.activityDate || w.date;
-      if (rawDate) {
-        const wDate = new Date(rawDate);
-        if (wDate >= monday && wDate <= sunday) {
-          totalKmWeek += Number(w.distanceKm || w.distance || 0);
-        }
-      }
-    });
-
-    const realizedEl = document.getElementById('cycle-realized-km');
-    if (realizedEl) {
-      realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
-    }
-  }
 
     async function loadHistory() {
       const container = document.getElementById('history-container');
@@ -415,7 +428,7 @@
           badgesHtml += `<span class="badge-pr">${b}</span>`;
         });
 
-        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷️ Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
+        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷️️ Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
         if (dist > 0) metaHtml += `<span>📏 Distância: <strong>${dist} km</strong></span>`;
         metaHtml += `<span>⏱️ Tempo em Movimento: <strong>${durationFormatted}</strong></span>`;
         if (dist > 0) metaHtml += `<span>⚡ Pace Médio: <strong>${pace}</strong></span>`;
@@ -457,7 +470,6 @@
 
       container.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 10px 0;">Carregando análise e voltas...</div>`;
 
-      // Busca a atividade atual diretamente no array global carregado do banco
       const currentWorkout = globalWorkouts.find(w => String(w.id) === String(id));
       const laps = currentWorkout?.laps || [];
 
