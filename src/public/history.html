@@ -173,142 +173,161 @@
     }
 
     async function syncProfileCycleTitle() {
-      const titleEl = document.getElementById('cycle-main-title');
-      const weeksContainer = document.getElementById('current-cycle-weeks-container');
-      let currentGoal = "Perda de Peso Progressiva (Foco em Déficit e Composição)";
+    const titleEl = document.getElementById('cycle-main-title');
+    const weeksContainer = document.getElementById('current-cycle-weeks-container');
+    let currentGoal = "Perda de Peso Progressiva (Foco em Déficit e Composição)";
 
-      // 1. Resgata o objetivo do perfil
-      const savedObjective = localStorage.getItem('user_objective');
-      if (savedObjective) {
-        currentGoal = savedObjective;
-      } else {
-        try {
-          const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-          if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
-            currentGoal = appState.profile.objectiveText || appState.profile.objective;
-          }
-        } catch (e) {
-          console.warn('Erro ao ler estado do localStorage:', e);
+    // 1. Resgata o objetivo do perfil
+    const savedObjective = localStorage.getItem('user_objective');
+    if (savedObjective) {
+      currentGoal = savedObjective;
+    } else {
+      try {
+        const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+        if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
+          currentGoal = appState.profile.objectiveText || appState.profile.objective;
         }
-      }
-
-      if (titleEl) {
-        titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
-      }
-
-      // 2. Intervalos de datas para as Semanas
-      const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-      const targetVolumeBase = Number(appState.targetVolume || appState.weeklyTargetKm || 21.67);
-      
-      const now = new Date();
-      const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1 = Seg, 7 = Dom
-      
-      // Segunda-feira da Semana 2 (Semana Atual)
-      const currentMonday = new Date(now);
-      currentMonday.setDate(now.getDate() - (currentDayOfWeek - 1));
-      currentMonday.setHours(0, 0, 0, 0);
-
-      // Segunda-feira da Semana 1 (Semana Passada)
-      const week1Monday = new Date(currentMonday);
-      week1Monday.setDate(currentMonday.getDate() - 7);
-
-      const cycleWeeks = [
-        {
-          weekNum: 2,
-          title: "Semana Atual: Bloco Ativo (Semana 2: Ritmo e Densidade)",
-          subtitle: "Foco configurado no perfil do atleta",
-          startDate: currentMonday,
-          endDate: new Date(currentMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000),
-          targetKm: targetVolumeBase,
-          isCurrent: true
-        },
-        {
-          weekNum: 1,
-          title: "Semana 1: Adaptação Inicial",
-          subtitle: "Registro Finalizado do Ciclo",
-          startDate: week1Monday,
-          endDate: new Date(week1Monday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000),
-          targetKm: 25.0,
-          isCurrent: false
-        }
-      ];
-
-      // 3. Processamento das atividades para cada semana
-      let weeksHtml = '';
-
-      cycleWeeks.forEach(w => {
-        let kmDone = 0;
-        let weekWorkouts = [];
-
-        globalWorkouts.forEach(workout => {
-          const rawDate = workout.activityDate || workout.date;
-          if (rawDate) {
-            const wDate = new Date(rawDate);
-            if (wDate >= w.startDate && wDate <= w.endDate) {
-              kmDone += Number(workout.distanceKm || workout.distance || 0);
-              weekWorkouts.push(workout);
-            }
-          }
-        });
-
-        const statusTag = w.isCurrent
-          ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
-          : `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>`;
-
-        // Renderiza lista detalhada dos treinos daquela semana
-        let workoutsListHtml = '';
-        if (weekWorkouts.length > 0) {
-          workoutsListHtml = weekWorkouts.map(item => {
-            const dist = Number(item.distanceKm || item.distance || 0);
-            const actDate = item.activityDate || item.date;
-            const dateFormatted = actDate ? String(actDate).substring(0, 10).split('-').reverse().join('/') : '-';
-            const pace = item.calculatedPace || item.pace || '-- /km';
-
-            return `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 6px; font-size: 13px;">
-                <div>
-                  <strong style="color: var(--text-main);">${item.title || 'Treino'}</strong>
-                  <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${item.type || 'corrida'})</span>
-                </div>
-                <div style="display: flex; gap: 15px; color: var(--text-muted);">
-                  <span>📏 <strong>${dist.toFixed(1)} km</strong></span>
-                  <span>⚡ Pace: <strong>${pace}</strong></span>
-                </div>
-              </div>
-            `;
-          }).join('');
-        } else {
-          workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
-        }
-
-        weeksHtml += `
-          <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails(${w.weekNum})">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div>
-                <strong style="color: var(--text-main);">${w.title}</strong>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${w.subtitle} (Clique para expandir/recolher)</div>
-              </div>
-              <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
-                <span>Alvo Base: <strong>${w.targetKm.toFixed(1)} km</strong></span>
-                <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
-                ${statusTag}
-                <span id="arrow-week-${w.weekNum}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">▲</span>
-              </div>
-            </div>
-            
-            <!-- Detalhes Expansíveis dos Treinos da Semana -->
-            <div id="details-week-${w.weekNum}" style="display: block; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
-              <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas:</div>
-              ${workoutsListHtml}
-            </div>
-          </div>
-        `;
-      });
-
-      if (weeksContainer) {
-        weeksContainer.innerHTML = weeksHtml;
+      } catch (e) {
+        console.warn('Erro ao ler estado do localStorage:', e);
       }
     }
+
+    if (titleEl) {
+      titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
+    }
+
+    const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+    const targetVolumeBase = Number(appState.targetVolume || appState.weeklyTargetKm || 21.67);
+    
+    const now = new Date();
+    const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1 = Seg, 7 = Dom
+    
+    // Segunda-feira da Semana Atual (Semana 2)
+    const currentMonday = new Date(now);
+    currentMonday.setDate(now.getDate() - (currentDayOfWeek - 1));
+    currentMonday.setHours(0, 0, 0, 0);
+
+    // 2. Descobre a data do treino mais antigo registrado no banco de dados
+    let oldestDate = new Date(currentMonday);
+    globalWorkouts.forEach(w => {
+      const rawDate = w.activityDate || w.date;
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime()) && d < oldestDate) {
+          oldestDate = d;
+        }
+      }
+    });
+
+    // Garante que a data inicial seja a segunda-feira daquela semana do primeiro treino
+    const oldestDayOfWeek = oldestDate.getDay() === 0 ? 7 : oldestDate.getDay();
+    const firstMonday = new Date(oldestDate);
+    firstMonday.setDate(oldestDate.getDate() - (oldestDayOfWeek - 1));
+    firstMonday.setHours(0, 0, 0, 0);
+
+    // 3. Monta dinamicamente todas as semanas desde o início do histórico até a semana atual
+    let cycleWeeks = [];
+    let iterMonday = new Date(firstMonday);
+    let weekIndex = 1;
+
+    while (iterMonday <= currentMonday) {
+      const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
+      const isCurrent = iterMonday.getTime() === currentMonday.getTime();
+
+      cycleWeeks.push({
+        weekNum: weekIndex,
+        title: isCurrent 
+          ? `Semana Atual: Bloco Ativo (Semana ${weekIndex}: Ritmo e Densidade)`
+          : `Semana ${weekIndex}: Adaptação / Bloco Anterior`,
+        subtitle: isCurrent ? "Foco configurado no perfil do atleta" : "Registro Finalizado do Ciclo",
+        startDate: new Date(iterMonday),
+        endDate: iterSunday,
+        targetKm: targetVolumeBase,
+        isCurrent: isCurrent
+      });
+
+      // Avança 7 dias para a próxima semana
+      iterMonday.setDate(iterMonday.getDate() + 7);
+      weekIndex++;
+    }
+
+    // Ordena as semanas da mais recente (Semana Atual) para a mais antiga
+    cycleWeeks.sort((a, b) => b.weekNum - a.weekNum);
+
+    // 4. Agrupa as atividades por semana e gera o HTML
+    let weeksHtml = '';
+
+    cycleWeeks.forEach(w => {
+      let kmDone = 0;
+      let weekWorkouts = [];
+
+      globalWorkouts.forEach(workout => {
+        const rawDate = workout.activityDate || workout.date;
+        if (rawDate) {
+          const wDate = new Date(rawDate);
+          if (wDate >= w.startDate && wDate <= w.endDate) {
+            kmDone += Number(workout.distanceKm || workout.distance || 0);
+            weekWorkouts.push(workout);
+          }
+        }
+      });
+
+      const statusTag = w.isCurrent
+        ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
+        : `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>`;
+
+      let workoutsListHtml = '';
+      if (weekWorkouts.length > 0) {
+        workoutsListHtml = weekWorkouts.map(item => {
+          const dist = Number(item.distanceKm || item.distance || 0);
+          const actDate = item.activityDate || item.date;
+          const dateFormatted = actDate ? String(actDate).substring(0, 10).split('-').reverse().join('/') : '-';
+          const pace = item.calculatedPace || item.pace || '-- /km';
+
+          return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 6px; font-size: 13px;">
+              <div>
+                <strong style="color: var(--text-main);">${item.title || 'Treino'}</strong>
+                <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${item.type || 'corrida'})</span>
+              </div>
+              <div style="display: flex; gap: 15px; color: var(--text-muted);">
+                <span>📏 <strong>${dist.toFixed(1)} km</strong></span>
+                <span>⚡ Pace: <strong>${pace}</strong></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
+      }
+
+      weeksHtml += `
+        <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails(${w.weekNum})">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <strong style="color: var(--text-main);">${w.title}</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${w.subtitle} (Clique para expandir/recolher)</div>
+            </div>
+            <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
+              <span>Alvo Base: <strong>${w.targetKm.toFixed(1)} km</strong></span>
+              <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
+              ${statusTag}
+              <span id="arrow-week-${w.weekNum}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">${w.isCurrent ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          
+          <div id="details-week-${w.weekNum}" style="display: ${w.isCurrent ? 'none' : 'block'}; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+            <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas:</div>
+            ${workoutsListHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    if (weeksContainer) {
+      weeksContainer.innerHTML = weeksHtml;
+    }
+  }
 
     function toggleWeekDetails(weekNum) {
       const detailsEl = document.getElementById(`details-week-${weekNum}`);
