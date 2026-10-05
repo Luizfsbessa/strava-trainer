@@ -137,7 +137,7 @@
       <div id="history-container">Buscando dados do banco...</div>
     </div>
 
-    <!-- Aba 2: Linha do Tempo de Ciclos (Dinâmica baseada no perfil) -->
+    <!-- Aba 2: Linha do Tempo de Ciclos (Dinâmica) -->
     <div id="pane-cycles" class="tab-pane">
       <div class="cycle-block">
         <div class="cycle-title">
@@ -146,35 +146,8 @@
         </div>
         <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Acompanhamento do progresso semanal baseado na sua diretriz de treinamento atual.</p>
         
-        <div class="week-item">
-          <div>
-            <strong style="color: var(--text-main);">Semana Atual: Bloco Ativo</strong>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Foco configurado no perfil do atleta</div>
-          </div>
-          <div style="display: flex; gap: 20px; font-size: 13px;">
-            <span>Alvo Base: <strong id="cycle-target-km">25.6 km</strong></span>
-            <span>Realizado: <strong id="cycle-realized-km" style="color: var(--accent-blue);">0.0 km</strong></span>
-            <span style="color: var(--accent-gold);">Em Andamento</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Exemplo de Ciclo Anterior Arquivado -->
-      <div class="cycle-block" style="opacity: 0.8;">
-        <div class="cycle-title" style="color: var(--text-muted);">
-          <span>🏁 Ciclo Anterior: Base Inicial e Adaptação</span>
-          <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px;">Concluído</span>
-        </div>
-        <div class="week-item">
-          <div>
-            <strong style="color: var(--text-main);">Semana 1: Adaptação Inicial</strong>
-          </div>
-          <div style="display: flex; gap: 20px; font-size: 13px;">
-            <span>Alvo: <strong>25.0 km</strong></span>
-            <span>Realizado: <strong style="color: var(--accent-blue);">26.5 km</strong></span>
-            <span style="color: var(--accent-blue);">Concluído</span>
-          </div>
-        </div>
+        <!-- Container dinâmico para renderizar Semana 1, Semana 2, etc. -->
+        <div id="current-cycle-weeks-container"></div>
       </div>
     </div>
 
@@ -200,14 +173,14 @@
 
     async function syncProfileCycleTitle() {
       const titleEl = document.getElementById('cycle-main-title');
-      let currentGoal = "Progresso Geral e Condicionamento";
+      const weeksContainer = document.getElementById('current-cycle-weeks-container');
+      let currentGoal = "Perda de Peso Progressiva (Foco em Déficit e Composição)";
 
-      // 1. Tenta buscar direto do localStorage onde o perfil salva o texto exato selecionado
+      // 1. Resgata o objetivo configurado no perfil
       const savedObjective = localStorage.getItem('user_objective');
       if (savedObjective) {
         currentGoal = savedObjective;
       } else {
-        // Fallback caso esteja no estado geral do app
         try {
           const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
           if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
@@ -222,46 +195,80 @@
         titleEl.innerText = `🎯 Ciclo Atual: ${currentGoal}`;
       }
 
-      // 2. Cálculo Unificado da Semana Atual (Segunda-feira até Domingo)
-      let totalKmWeek = 0;
-      const now = new Date();
-      const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Segunda, ...
-      const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek); // Segunda-feira desta semana
+      // 2. Cálculo dos intervalos de datas para Semana 1 (Passada) e Semana 2 (Atual)
+      const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
+      const targetVolumeBase = Number(appState.targetVolume || appState.weeklyTargetKm || 21.67);
       
-      const monday = new Date(now);
-      monday.setDate(now.getDate() + diffToMonday);
-      monday.setHours(0, 0, 0, 0);
+      const now = new Date();
+      const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1 = Seg, 7 = Dom
+      
+      // Segunda-feira da Semana 2 (Semana Atual)
+      const currentMonday = new Date(now);
+      currentMonday.setDate(now.getDate() - (currentDayOfWeek - 1));
+      currentMonday.setHours(0, 0, 0, 0);
 
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
+      // Segunda-feira da Semana 1 (Semana Passada)
+      const week1Monday = new Date(currentMonday);
+      week1Monday.setDate(currentMonday.getDate() - 7);
 
-      globalWorkouts.forEach(w => {
-        const rawDate = w.activityDate || w.date;
-        if (rawDate) {
-          const wDate = new Date(rawDate);
-          if (wDate >= monday && wDate <= sunday) {
-            totalKmWeek += Number(w.distanceKm || w.distance || 0);
-          }
+      const cycleWeeks = [
+        {
+          weekNum: 2,
+          title: "Semana Atual: Bloco Ativo (Semana 2: Ritmo e Densidade)",
+          subtitle: "Foco configurado no perfil do atleta",
+          startDate: currentMonday,
+          endDate: new Date(currentMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000),
+          targetKm: targetVolumeBase,
+          isCurrent: true
+        },
+        {
+          weekNum: 1,
+          title: "Semana 1: Adaptação Inicial",
+          subtitle: "Registro Finalizado do Ciclo",
+          startDate: week1Monday,
+          endDate: new Date(week1Monday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000),
+          targetKm: 25.0,
+          isCurrent: false
         }
+      ];
+
+      // 3. Renderização dinâmica com cálculo do volume real por semana
+      let weeksHtml = '';
+
+      cycleWeeks.forEach(w => {
+        let kmDone = 0;
+
+        globalWorkouts.forEach(workout => {
+          const rawDate = workout.activityDate || workout.date;
+          if (rawDate) {
+            const wDate = new Date(rawDate);
+            if (wDate >= w.startDate && wDate <= w.endDate) {
+              kmDone += Number(workout.distanceKm || workout.distance || 0);
+            }
+          }
+        });
+
+        const statusTag = w.isCurrent
+          ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
+          : `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>`;
+
+        weeksHtml += `
+          <div class="week-item" style="margin-bottom: 10px; ${!w.isCurrent ? 'opacity: 0.9;' : ''}">
+            <div>
+              <strong style="color: var(--text-main);">${w.title}</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${w.subtitle}</div>
+            </div>
+            <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
+              <span>Alvo Base: <strong>${w.targetKm.toFixed(1)} km</strong></span>
+              <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
+              ${statusTag}
+            </div>
+          </div>
+        `;
       });
 
-      const realizedEl = document.getElementById('cycle-realized-km');
-      if (realizedEl) {
-        realizedEl.innerText = `${totalKmWeek.toFixed(1)} km`;
-      }
-
-      // 3. Sincronização Dinâmica do Volume Alvo (Meta)
-      try {
-        const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-        const targetVolume = appState.targetVolume || appState.weeklyTargetKm || appState.calculatedTargetKm || 25.62;
-        
-        const targetEl = document.getElementById('cycle-target-km');
-        if (targetEl) {
-          targetEl.innerText = `${Number(targetVolume).toFixed(1)} km`;
-        }
-      } catch (e) {
-        console.warn('Erro ao ler volume alvo do estado:', e);
+      if (weeksContainer) {
+        weeksContainer.innerHTML = weeksHtml;
       }
     }
 
@@ -428,7 +435,7 @@
           badgesHtml += `<span class="badge-pr">${b}</span>`;
         });
 
-        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷️️ Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
+        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷 Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
         if (dist > 0) metaHtml += `<span>📏 Distância: <strong>${dist} km</strong></span>`;
         metaHtml += `<span>⏱️ Tempo em Movimento: <strong>${durationFormatted}</strong></span>`;
         if (dist > 0) metaHtml += `<span>⚡ Pace Médio: <strong>${pace}</strong></span>`;
