@@ -198,18 +198,56 @@
 
     function formatGoalLabel(goalRaw) {
       const g = String(goalRaw || '').toLowerCase();
-      if (g.includes('5km') || g.includes('5 km') || g.includes('velocidade')) return 'Concluir / Baixar Tempo nos 5 km';
       if (g.includes('10km') || g.includes('10 km')) return 'Resistência e Ritmo nos 10 km';
+      if (g.includes('5km') || g.includes('5 km') || g.includes('velocidade')) return 'Concluir / Baixar Tempo nos 5 km';
       if (g.includes('meia') || g.includes('21')) return 'Meia Maratona (21.1 km)';
       if (g.includes('maratona')) return 'Maratona (42.2 km)';
       return 'Perda de Peso Progressiva';
+    }
+
+    // Retorna a meta semanal (Alvo Base em KM) com base no objetivo e no número da semana
+    function getWeeklyTargetKm(goalRaw, weekIndex) {
+      const g = String(goalRaw || '').toLowerCase();
+      
+      // Progressão para 10 km
+      if (g.includes('10km') || g.includes('10 km')) {
+        const base10k = [24.0, 26.5, 29.0, 22.0]; // Semanas 1, 2, 3 (Pico), 4 (Deload)
+        return base10k[(weekIndex - 1) % 4];
+      }
+      
+      // Progressão para 5 km
+      if (g.includes('5km') || g.includes('5 km')) {
+        const base5k = [18.0, 20.0, 22.5, 16.0];
+        return base5k[(weekIndex - 1) % 4];
+      }
+      
+      // Progressão para Perda de Peso / Base
+      const baseWeight = [15.0, 17.0, 19.0, 14.0];
+      return baseWeight[(weekIndex - 1) % 4];
     }
 
     async function syncProfileCycleTitle() {
       const cyclesPane = document.getElementById('pane-cycles');
       if (!cyclesPane) return;
 
-      // 1. Definição do histórico de objetivos/ciclos
+      // 1. Obtém o objetivo atual do Perfil (salvo no localStorage ou Perfil)
+      let activeGoalFromProfile = 'Concluir / Baixar Tempo nos 5 km';
+      try {
+        const savedProfile = localStorage.getItem('user_profile');
+        if (savedProfile) {
+          const parsedProfile = JSON.parse(savedProfile);
+          if (parsedProfile.goal || parsedProfile.objective) {
+            activeGoalFromProfile = parsedProfile.goal || parsedProfile.objective;
+          }
+        } else {
+          const directGoal = localStorage.getItem('user_goal');
+          if (directGoal) activeGoalFromProfile = directGoal;
+        }
+      } catch (e) {
+        console.warn('Erro ao ler perfil do localStorage', e);
+      }
+
+      // 2. Carrega histórico de ciclos do localStorage
       let rawHistory = localStorage.getItem('user_objective_history');
       let objectiveHistory = [];
 
@@ -217,7 +255,7 @@
         try { objectiveHistory = JSON.parse(rawHistory); } catch(e) {}
       }
 
-      // Se não houver histórico, cria a sequência padronizada baseada nos registos passados
+      // Se não existir histórico inicial, cria a estrutura com base no histórico
       if (!objectiveHistory || objectiveHistory.length === 0) {
         objectiveHistory = [
           {
@@ -228,28 +266,44 @@
             isAdaptation: true
           },
           {
-            id: 'cycle-weightloss',
+            id: 'cycle-prev',
             goal: 'Perda de Peso Progressiva',
             startDate: '2026-09-28',
             endDate: '2026-10-04',
             isAdaptation: false
           },
           {
-            id: 'cycle-5k',
-            goal: 'Concluir / Baixar Tempo nos 5 km',
+            id: 'cycle-active',
+            goal: activeGoalFromProfile,
             startDate: '2026-10-05',
             endDate: null, // Ciclo Ativo
             isAdaptation: false
           }
         ];
+      } else {
+        // Verifica se o objetivo atual do perfil mudou em relação ao ciclo ativo registrado
+        const activeCycle = objectiveHistory.find(c => !c.endDate);
+        if (activeCycle && activeCycle.goal !== activeGoalFromProfile) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          activeCycle.endDate = todayStr; // Finaliza o ciclo antigo
+
+          // Cria o novo ciclo com o novo objetivo do perfil
+          objectiveHistory.push({
+            id: 'cycle-' + Date.now(),
+            goal: activeGoalFromProfile,
+            startDate: todayStr,
+            endDate: null,
+            isAdaptation: false
+          });
+
+          localStorage.setItem('user_objective_history', JSON.stringify(objectiveHistory));
+        }
       }
 
       let fullCyclesHtml = '';
-
-      // Processa do ciclo mais recente para o mais antigo (ordem cronológica inversa)
       const sortedHistory = [...objectiveHistory].reverse();
 
-      sortedHistory.forEach((cycle, cycleIdx) => {
+      sortedHistory.forEach((cycle) => {
         const isCurrentCycle = !cycle.endDate;
         const cycleTitleFormatted = formatGoalLabel(cycle.goal);
         const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
@@ -259,7 +313,6 @@
         let totalCycleKm = 0;
 
         if (cycle.isAdaptation) {
-          // Bloco Especial: Período de Adaptação
           let adaptationWorkouts = [];
           globalWorkouts.forEach(workout => {
             const rawDateStr = getWorkoutProp(workout, 'date');
@@ -308,13 +361,12 @@
                 </div>
               </div>
               <div id="details-week-adapt" style="display: none; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
-                <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Registadas:</div>
-                ${workoutsListHtml || '<div style="font-size: 12px; color: var(--text-muted);">Nenhum treino registado neste período.</div>'}
+                <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Registradas:</div>
+                ${workoutsListHtml || '<div style="font-size: 12px; color: var(--text-muted);">Nenhum treino registrado neste período.</div>'}
               </div>
             </div>
           `;
         } else {
-          // Bloco Normal de Ciclo: Divisão Semana 1, Semana 2, etc.
           let iterMonday = new Date(cycleStartDate);
           let weekIndex = 1;
 
@@ -329,6 +381,9 @@
               case 3: weekPhaseName += `: Pico de Carga`; break;
               case 4: weekPhaseName += `: Deload / Regenerativa`; break;
             }
+
+            // Calcula o Alvo Dinâmico em KM com base no objetivo do ciclo e na semana
+            const targetKm = getWeeklyTargetKm(cycle.goal, weekIndex);
 
             let kmDone = 0;
             let weekWorkouts = [];
@@ -386,7 +441,7 @@
                     </div>
                   </div>
                   <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
-                    <span>Alvo Base: <strong>21.7 km</strong></span>
+                    <span>Alvo Base: <strong>${targetKm.toFixed(1)} km</strong></span>
                     <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
                     ${statusTag}
                     <span id="arrow-week-${weekUid}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">${isCurrentWeek ? '▼' : '▲'}</span>
@@ -410,9 +465,9 @@
           : `<span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">Finalizado</span>`;
 
         fullCyclesHtml += `
-          <div class="cycle-block">
-            <div class="cycle-title">
-              <span>🎯 ${cycle.isAdaptation ? 'Período de Adaptação' : 'Ciclo: ' + cycleTitleFormatted}</span>
+          <div class="cycle-block" style="background: var(--card-bg, #0f172a); border: 1px solid var(--border-color, #1e293b); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div class="cycle-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 16px; font-weight: bold; color: var(--text-main);">🎯 ${cycle.isAdaptation ? 'Período de Adaptação' : 'Ciclo: ' + cycleTitleFormatted}</span>
               ${badgeTag}
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
