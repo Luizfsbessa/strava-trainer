@@ -303,7 +303,7 @@
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         const rawProfile = data.profile || {};
-        const activeCycle = data.activeCycle || null; // Objeto de ciclo vindo do servidor
+        const activeCycle = data.activeCycle || null; 
         
         const storedWeight = localStorage.getItem('user_current_weight');
         const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
@@ -335,7 +335,6 @@
         endOfCurrentWeek.setDate(startOfCurrentWeek.getDate() + 6);
         endOfCurrentWeek.setHours(23, 59, 59, 999);
 
-        // Tratamento seguro do volume da semana atual
         const currentWeekKm = workouts
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
@@ -351,7 +350,6 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // Cálculo da semana anterior encerrada
         const startOfPreviousWeek = new Date(startOfCurrentWeek);
         startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7);
         const endOfPreviousWeek = new Date(startOfCurrentWeek);
@@ -372,28 +370,27 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // A base é FIXA na semana anterior (ex: 24.4 km), impedindo o efeito bola de neve no decorrer da semana atual
         const DEFAULT_INITIAL_KM = 20.0;
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
-        
-        // Fator fixo de incremento incremental (5% de ganho sobre a semana anterior)
         const PROGRESSION_RATE = 1.05;
 
-        // --- CÁLCULO DINÂMICO DA SEMANA BASEADO NA DATA DE REGISTRO / INÍCIO DO CICLO ---
+        // --- DEDUÇÃO DINÂMICA DO CICLO APÓS MUDANÇA DE META ---
         let cycleStartDate;
-        const sortedRuns = workouts
-          .filter(w => {
-            const wType = String(w.type || 'corrida').toLowerCase();
-            return (wType === 'corrida' || wType === 'run') && (parseFloat(w.distanceKm || w.distance) || 0) > 0;
-          })
-          .sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
+        const updatedGoalDate = localStorage.getItem('user_objective_updated_at');
 
-        if (activeCycle && activeCycle.startDate) {
+        if (updatedGoalDate) {
+          cycleStartDate = new Date(updatedGoalDate);
+        } else if (activeCycle && activeCycle.startDate) {
           cycleStartDate = new Date(activeCycle.startDate);
-        } else if (sortedRuns.length > 0) {
-          cycleStartDate = new Date(sortedRuns[0].activityDate || sortedRuns[0].date);
         } else {
-          cycleStartDate = new Date();
+          const sortedRuns = workouts
+            .filter(w => {
+              const wType = String(w.type || 'corrida').toLowerCase();
+              return (wType === 'corrida' || wType === 'run') && (parseFloat(w.distanceKm || w.distance) || 0) > 0;
+            })
+            .sort((a, b) => new Date(a.activityDate || a.date) - new Date(b.activityDate || b.date));
+
+          cycleStartDate = sortedRuns.length > 0 ? new Date(sortedRuns[0].activityDate || sortedRuns[0].date) : new Date();
         }
 
         cycleStartDate.setHours(0, 0, 0, 0);
@@ -408,15 +405,13 @@
         const cycleWeekNumber = (weekIndex % 4) + 1;
 
         let cycleWeekName = '';
-
         switch (cycleWeekNumber) {
-          case 1: cycleWeekName = 'Semana 1: Base e Construção'; break;
+          case 1: cycleWeekName = 'Semana 1: Adaptação Inicial e Base'; break;
           case 2: cycleWeekName = 'Semana 2: Ritmo e Densidade'; break;
           case 3: cycleWeekName = 'Semana 3: Pico de Carga'; break;
           case 4: cycleWeekName = 'Semana 4: Deload / Regenerativa'; break;
         }
 
-        // Meta congelada e cravada para a semana corrente
         const dynamicTargetKm = baseVolForProgression * PROGRESSION_RATE * objectiveConfig.volumeMultiplier;
         const basePaceSecs = calculateBasePace(workouts);
 
@@ -530,7 +525,7 @@
     function getObjectiveMatrix(objective) {
       const objStr = String(objective || "").toLowerCase();
 
-      if (objStr.includes("5 km") || objStr.includes("5km")) {
+      if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
         return {
           text: "Meta: 5 km (Velocidade)",
           volumeMultiplier: 1.0,
