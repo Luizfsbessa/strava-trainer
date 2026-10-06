@@ -232,60 +232,70 @@
         console.warn('Erro ao ler perfil do localStorage', e);
       }
 
+      const currentGoalFormatted = formatGoalLabel(activeGoalFromProfile);
+
+      // Mantém apenas os ciclos que possuem trocas de objetivos intencionais e evita duplicatas por QA
       let rawHistory = localStorage.getItem('user_objective_history');
       let objectiveHistory = [];
+      try {
+        if (rawHistory) objectiveHistory = JSON.parse(rawHistory);
+      } catch (e) {}
 
-      if (rawHistory) {
-        try { objectiveHistory = JSON.parse(rawHistory); } catch(e) {}
-      }
+      // Remove duplicados do mesmo objetivo se tiver sido criado durante testes
+      const uniqueHistoryMap = new Map();
+      objectiveHistory.forEach(c => {
+        const key = formatGoalLabel(c.goal);
+        if (!uniqueHistoryMap.has(key)) {
+          uniqueHistoryMap.set(key, c);
+        }
+      });
 
-      // Se o último ciclo registrado for diferente do atual no Perfil, ajustamos
-      const activeCycle = objectiveHistory.find(c => !c.endDate);
-      const formattedCurrentGoal = formatGoalLabel(activeGoalFromProfile);
+      objectiveHistory = Array.from(uniqueHistoryMap.values());
 
-      if (!activeCycle || formatGoalLabel(activeCycle.goal) !== formattedCurrentGoal) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (activeCycle) activeCycle.endDate = todayStr;
+      // Garante que o objetivo atual selecionado seja o único marcado como ATIVO
+      let activeCycleFound = false;
+      objectiveHistory.forEach(c => {
+        if (formatGoalLabel(c.goal) === currentGoalFormatted) {
+          c.endDate = null; // Ativo
+          activeCycleFound = true;
+        } else {
+          if (!c.endDate) c.endDate = new Date().toISOString().split('T')[0]; // Finalizado
+        }
+      });
 
-        objectiveHistory = objectiveHistory.filter(c => c.endDate);
+      if (!activeCycleFound) {
         objectiveHistory.push({
           id: 'cycle-' + Date.now(),
-          goal: formattedCurrentGoal,
-          startDate: '2026-09-21', // Data de início do bloco
-          endDate: null,
-          isAdaptation: false
+          goal: currentGoalFormatted,
+          startDate: '2026-09-21',
+          endDate: null
         });
-
-        // Adiciona ciclo de Perda de Peso anterior para manter o histórico
-        if (!objectiveHistory.some(c => c.goal.includes('Peso'))) {
-          objectiveHistory.unshift({
-            id: 'cycle-prev-weight',
-            goal: 'Perda de Peso Progressiva',
-            startDate: '2026-09-01',
-            endDate: '2026-09-20',
-            isAdaptation: false
-          });
-        }
-
-        localStorage.setItem('user_objective_history', JSON.stringify(objectiveHistory));
       }
 
-      let fullCyclesHtml = '';
-      const sortedHistory = [...objectiveHistory].reverse();
+      // Atualiza localStorage limpo
+      localStorage.setItem('user_objective_history', JSON.stringify(objectiveHistory));
 
-      sortedHistory.forEach((cycle) => {
+      let fullCyclesHtml = '';
+
+      // Renderiza apenas o Ciclo Ativo Atual no topo
+      const activeCycle = objectiveHistory.find(c => !c.endDate) || objectiveHistory[objectiveHistory.length - 1];
+      const finishedCycles = objectiveHistory.filter(c => c !== activeCycle);
+
+      const displayCycles = [activeCycle, ...finishedCycles];
+
+      displayCycles.forEach((cycle) => {
+        if (!cycle) return;
         const isCurrentCycle = !cycle.endDate;
         const cycleTitleFormatted = formatGoalLabel(cycle.goal);
+        
+        // Regra de data para cada ciclo
         const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
         const cycleEndDate = cycle.endDate ? new Date(cycle.endDate + 'T23:59:59') : new Date();
 
         let weeksHtml = '';
-        let totalCycleKm = 0;
-
         let iterMonday = new Date(cycleStartDate);
         let weekIndex = 1;
 
-        // Caso seja o ciclo ativo, ajustamos a visualização para bater com o Dashboard (Semana 3)
         while (iterMonday <= cycleEndDate) {
           const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
           const isCurrentWeek = isCurrentCycle && (new Date() >= iterMonday && new Date() <= iterSunday);
@@ -315,8 +325,6 @@
               }
             }
           });
-
-          totalCycleKm += kmDone;
 
           const statusTag = isCurrentWeek
             ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
