@@ -153,7 +153,6 @@
     let currentDisplayDate = new Date();
     let prRecords = {};
 
-    // Helper unificado para extrair propriedades independentemente do padrão de nome (snake_case vs camelCase)
     function getWorkoutProp(w, prop) {
       if (!w) return null;
       switch (prop) {
@@ -172,7 +171,6 @@
       }
     }
 
-    // Normaliza string de data no formato AAAA-MM-DD sem distorção de fuso horário
     function parseLocalDateStr(rawDate) {
       if (!rawDate) return '';
       const str = String(rawDate).trim();
@@ -205,23 +203,19 @@
       return 'Perda de Peso Progressiva';
     }
 
-    // Retorna a meta semanal (Alvo Base em KM) com base no objetivo e no número da semana
     function getWeeklyTargetKm(goalRaw, weekIndex) {
       const g = String(goalRaw || '').toLowerCase();
       
-      // Progressão para 10 km
       if (g.includes('10km') || g.includes('10 km')) {
-        const base10k = [24.0, 26.5, 29.0, 22.0]; // Semanas 1, 2, 3 (Pico), 4 (Deload)
+        const base10k = [24.0, 26.5, 29.0, 22.0];
         return base10k[(weekIndex - 1) % 4];
       }
       
-      // Progressão para 5 km
       if (g.includes('5km') || g.includes('5 km')) {
         const base5k = [18.0, 20.0, 22.5, 16.0];
         return base5k[(weekIndex - 1) % 4];
       }
       
-      // Progressão para Perda de Peso / Base
       const baseWeight = [15.0, 17.0, 19.0, 14.0];
       return baseWeight[(weekIndex - 1) % 4];
     }
@@ -230,7 +224,6 @@
       const cyclesPane = document.getElementById('pane-cycles');
       if (!cyclesPane) return;
 
-      // 1. Obtém o objetivo atual do Perfil (salvo no localStorage ou Perfil)
       let activeGoalFromProfile = 'Concluir / Baixar Tempo nos 5 km';
       try {
         const savedProfile = localStorage.getItem('user_profile');
@@ -247,7 +240,6 @@
         console.warn('Erro ao ler perfil do localStorage', e);
       }
 
-      // 2. Carrega histórico de ciclos do localStorage
       let rawHistory = localStorage.getItem('user_objective_history');
       let objectiveHistory = [];
 
@@ -255,7 +247,6 @@
         try { objectiveHistory = JSON.parse(rawHistory); } catch(e) {}
       }
 
-      // Se não existir histórico inicial, cria a estrutura com base no histórico
       if (!objectiveHistory || objectiveHistory.length === 0) {
         objectiveHistory = [
           {
@@ -276,18 +267,16 @@
             id: 'cycle-active',
             goal: activeGoalFromProfile,
             startDate: '2026-10-05',
-            endDate: null, // Ciclo Ativo
+            endDate: null,
             isAdaptation: false
           }
         ];
       } else {
-        // Verifica se o objetivo atual do perfil mudou em relação ao ciclo ativo registrado
         const activeCycle = objectiveHistory.find(c => !c.endDate);
         if (activeCycle && activeCycle.goal !== activeGoalFromProfile) {
           const todayStr = new Date().toISOString().split('T')[0];
-          activeCycle.endDate = todayStr; // Finaliza o ciclo antigo
+          activeCycle.endDate = todayStr;
 
-          // Cria o novo ciclo com o novo objetivo do perfil
           objectiveHistory.push({
             id: 'cycle-' + Date.now(),
             goal: activeGoalFromProfile,
@@ -382,7 +371,6 @@
               case 4: weekPhaseName += `: Deload / Regenerativa`; break;
             }
 
-            // Calcula o Alvo Dinâmico em KM com base no objetivo do ciclo e na semana
             const targetKm = getWeeklyTargetKm(cycle.goal, weekIndex);
 
             let kmDone = 0;
@@ -667,7 +655,7 @@
 
         let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷 Tipo: <strong>${type}</strong></span>`;
         if (dist > 0) metaHtml += `<span>📏 Distância: <strong>${dist} km</strong></span>`;
-        metaHtml += `<span>⏱️️ Tempo em Movimento: <strong>${durationFormatted}</strong></span>`;
+        metaHtml += `<span>⏱ Tempo em Movimento: <strong>${durationFormatted}</strong></span>`;
         if (dist > 0) metaHtml += `<span>⚡ Pace Médio: <strong>${pace}</strong></span>`;
 
         let chartHtml = `<div id="details-content-${workoutId}">
