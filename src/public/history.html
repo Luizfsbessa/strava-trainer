@@ -153,6 +153,34 @@
     let currentDisplayDate = new Date();
     let prRecords = {};
 
+    // Helper unificado para extrair propriedades independentemente do padrão de nome (snake_case vs camelCase)
+    function getWorkoutProp(w, prop) {
+      if (!w) return null;
+      switch (prop) {
+        case 'date':
+          return w.activity_date || w.activityDate || w.date || w.created_at || null;
+        case 'distance':
+          return Number(w.distance_km ?? w.distanceKm ?? w.distance ?? 0);
+        case 'pace':
+          return w.calculated_pace || w.calculatedPace || w.pace || '-- /km';
+        case 'moving_sec':
+          return Number(w.moving_time_sec ?? w.movingTimeSec ?? (w.durationMinutes ? w.durationMinutes * 60 : 0));
+        case 'type':
+          return w.type || w.activity_type || w.activityType || 'corrida';
+        default:
+          return w[prop];
+      }
+    }
+
+    // Normaliza string de data no formato AAAA-MM-DD sem distorção de fuso horário
+    function parseLocalDateStr(rawDate) {
+      if (!rawDate) return '';
+      const str = String(rawDate).trim();
+      if (str.includes('T')) return str.split('T')[0];
+      if (str.includes(' ')) return str.split(' ')[0];
+      return str.substring(0, 10);
+    }
+
     function switchHistoryTab(tabName, event) {
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
@@ -163,7 +191,9 @@
         document.getElementById('pane-cycles').classList.add('active');
         syncProfileCycleTitle();
       }
-      event.currentTarget.classList.add('active');
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+      }
     }
 
     function formatGoalLabel(goalRaw) {
@@ -179,7 +209,15 @@
       const titleEl = document.getElementById('cycle-main-title');
       const weeksContainer = document.getElementById('current-cycle-weeks-container');
       
-      const savedObj = localStorage.getItem('user_objective') || '5km';
+      let savedObj = localStorage.getItem('user_objective');
+      if (!savedObj) {
+        try {
+          const profileData = JSON.parse(localStorage.getItem('user_profile') || '{}');
+          savedObj = profileData.objective || profileData.meta || '5km';
+        } catch (e) {
+          savedObj = '5km';
+        }
+      }
       const formattedGoal = formatGoalLabel(savedObj);
 
       if (titleEl) {
@@ -243,11 +281,14 @@
         let weekWorkouts = [];
 
         globalWorkouts.forEach(workout => {
-          const rawDate = workout.activityDate || workout.date;
-          if (rawDate) {
-            const wDate = new Date(rawDate);
+          const rawDateStr = getWorkoutProp(workout, 'date');
+          if (rawDateStr) {
+            const dateOnly = parseLocalDateStr(rawDateStr);
+            const [yyyy, mm, dd] = dateOnly.split('-').map(Number);
+            const wDate = new Date(yyyy, mm - 1, dd, 12, 0, 0);
+
             if (wDate >= w.startDate && wDate <= w.endDate) {
-              kmDone += Number(workout.distanceKm || workout.distance || 0);
+              kmDone += getWorkoutProp(workout, 'distance');
               weekWorkouts.push(workout);
             }
           }
@@ -260,16 +301,17 @@
         let workoutsListHtml = '';
         if (weekWorkouts.length > 0) {
           workoutsListHtml = weekWorkouts.map(item => {
-            const dist = Number(item.distanceKm || item.distance || 0);
-            const actDate = item.activityDate || item.date;
-            const dateFormatted = actDate ? String(actDate).substring(0, 10).split('-').reverse().join('/') : '-';
-            const pace = item.calculatedPace || item.pace || '-- /km';
+            const dist = getWorkoutProp(item, 'distance');
+            const actDate = getWorkoutProp(item, 'date');
+            const dateFormatted = actDate ? parseLocalDateStr(actDate).split('-').reverse().join('/') : '-';
+            const pace = getWorkoutProp(item, 'pace');
+            const type = getWorkoutProp(item, 'type');
 
             return `
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 6px; font-size: 13px;">
                 <div>
                   <strong style="color: var(--text-main);">${item.title || 'Treino'}</strong>
-                  <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${item.type || 'corrida'})</span>
+                  <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${type})</span>
                 </div>
                 <div style="display: flex; gap: 15px; color: var(--text-muted);">
                   <span>📏 <strong>${dist.toFixed(1)} km</strong></span>
@@ -330,13 +372,19 @@
         globalWorkouts = Array.isArray(data) ? data : (data.workouts || []);
 
         if (!globalWorkouts || globalWorkouts.length === 0) {
-          container.innerHTML = `<div class="empty-state">Nenhuma atividade encontrada no banco de dados.</div>`;
-          document.getElementById('calendar-days-grid').innerHTML = '';
-          document.getElementById('cal-month-title').innerText = 'Nenhum registro';
+          if (container) container.innerHTML = `<div class="empty-state">Nenhuma atividade encontrada no banco de dados.</div>`;
+          const calGrid = document.getElementById('calendar-days-grid');
+          const calTitle = document.getElementById('cal-month-title');
+          if (calGrid) calGrid.innerHTML = '';
+          if (calTitle) calTitle.innerText = 'Nenhum registro';
           return;
         }
 
-        globalWorkouts.sort((a, b) => new Date(b.activityDate || b.date) - new Date(a.activityDate || a.date));
+        globalWorkouts.sort((a, b) => {
+          const dateA = new Date(getWorkoutProp(a, 'date'));
+          const dateB = new Date(getWorkoutProp(b, 'date'));
+          return dateB - dateA;
+        });
 
         calculatePersonalRecords(globalWorkouts);
         renderCalendar(globalWorkouts);
@@ -344,7 +392,7 @@
         syncProfileCycleTitle();
       } catch (err) {
         console.error('Erro ao carregar histórico:', err);
-        container.innerHTML = `<div class="empty-state">Erro ao conectar com o banco de dados.</div>`;
+        if (container) container.innerHTML = `<div class="empty-state">Erro ao conectar com o banco de dados.</div>`;
       }
     }
 
@@ -353,7 +401,7 @@
       let maxDist = -1;
 
       workouts.forEach(w => {
-        const dist = Number(w.distanceKm || w.distance || 0);
+        const dist = getWorkoutProp(w, 'distance');
         const id = w.id;
         if (!prRecords.recordsMap[id]) prRecords.recordsMap[id] = [];
 
@@ -415,6 +463,8 @@
     function renderCalendar(workouts) {
       const grid = document.getElementById('calendar-days-grid');
       const titleEl = document.getElementById('cal-month-title');
+      if (!grid || !titleEl) return;
+
       const year = currentDisplayDate.getFullYear();
       const month = currentDisplayDate.getMonth();
       
@@ -436,8 +486,8 @@
       for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayWorkouts = workouts.filter(w => {
-          const rawDate = w.activityDate || w.date;
-          return rawDate && String(rawDate).trim().substring(0, 10) === dateStr;
+          const rawDate = getWorkoutProp(w, 'date');
+          return rawDate && parseLocalDateStr(rawDate) === dateStr;
         });
 
         let cellClass = '';
@@ -445,11 +495,12 @@
 
         if (dayWorkouts.length > 0) {
           const w = dayWorkouts[0];
-          if (w.type === 'mobilidade') cellClass = 'has-mobility';
-          else if (w.type === 'educativo') cellClass = 'has-drills';
+          const type = getWorkoutProp(w, 'type');
+          if (type === 'mobilidade') cellClass = 'has-mobility';
+          else if (type === 'educativo') cellClass = 'has-drills';
           else cellClass = 'has-workout';
 
-          iconsHtml = getWorkoutIconTag(w.type, w.activityDate || w.date);
+          iconsHtml = getWorkoutIconTag(type, getWorkoutProp(w, 'date'));
         }
 
         html += `
@@ -465,17 +516,19 @@
 
     function renderWorkoutsList(workouts) {
       const container = document.getElementById('history-container');
-      
+      if (!container) return;
+
       container.innerHTML = workouts.map((w, index) => {
-        const dist = Number(w.distanceKm || w.distance || 0);
-        const movingSecs = Number(w.moving_time_sec || (w.durationMinutes ? w.durationMinutes * 60 : 0));
+        const dist = getWorkoutProp(w, 'distance');
+        const movingSecs = getWorkoutProp(w, 'moving_sec');
         const durationFormatted = formatTimeHMS(movingSecs);
-        const pace = w.calculatedPace || w.pace || '-- /km';
-        const actDate = w.activityDate || w.date;
-        const workoutIconTag = getWorkoutIconTag(w.type, actDate);
-        const dateFormatted = actDate ? String(actDate).substring(0, 10).split('-').reverse().join('/') : '-';
+        const pace = getWorkoutProp(w, 'pace');
+        const actDate = getWorkoutProp(w, 'date');
+        const type = getWorkoutProp(w, 'type');
+        const workoutIconTag = getWorkoutIconTag(type, actDate);
+        const dateFormatted = actDate ? parseLocalDateStr(actDate).split('-').reverse().join('/') : '-';
         const workoutId = w.id || index;
-        const targetStravaId = w.stravaId || w.externalId || w.id || '';
+        const targetStravaId = w.strava_id || w.stravaId || w.externalId || w.id || '';
 
         let badgesHtml = '';
         const workoutBadges = prRecords.recordsMap[workoutId] || [];
@@ -483,7 +536,7 @@
           badgesHtml += `<span class="badge-pr">${b}</span>`;
         });
 
-        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷 Tipo: <strong>${w.type || 'corrida'}</strong></span>`;
+        let metaHtml = `<span>📅 <strong>${dateFormatted}</strong></span><span>🏷 Tipo: <strong>${type}</strong></span>`;
         if (dist > 0) metaHtml += `<span>📏 Distância: <strong>${dist} km</strong></span>`;
         metaHtml += `<span>⏱️ Tempo em Movimento: <strong>${durationFormatted}</strong></span>`;
         if (dist > 0) metaHtml += `<span>⚡ Pace Médio: <strong>${pace}</strong></span>`;
@@ -543,9 +596,9 @@
             <tbody>
               ${laps.map(l => `
                 <tr>
-                  <td><strong>Volta ${l.lap_index}</strong></td>
-                  <td>${l.distance_km} km</td>
-                  <td>${l.moving_time_formatted}</td>
+                  <td><strong>Volta ${l.lap_index ?? l.lapIndex}</strong></td>
+                  <td>${l.distance_km ?? l.distanceKm} km</td>
+                  <td>${l.moving_time_formatted ?? l.movingTimeFormatted}</td>
                   <td>${l.pace}</td>
                 </tr>
               `).join('')}
@@ -643,8 +696,8 @@
       document.querySelectorAll('.card-wrapper').forEach(c => c.classList.remove('highlight'));
       
       const matched = globalWorkouts.filter(w => {
-        const rawDate = w.activityDate || w.date;
-        return rawDate && String(rawDate).trim().substring(0, 10) === dateStr;
+        const rawDate = getWorkoutProp(w, 'date');
+        return rawDate && parseLocalDateStr(rawDate) === dateStr;
       });
       
       if (matched.length > 0) {
