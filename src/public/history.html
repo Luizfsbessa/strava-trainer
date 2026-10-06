@@ -213,194 +213,173 @@
     }
 
     async function syncProfileCycleTitle() {
-      const cyclesContainer = document.getElementById('current-cycle-weeks-container');
-      if (!cyclesContainer) return;
+  const cyclesContainer = document.getElementById('current-cycle-weeks-container');
+  if (!cyclesContainer) return;
 
-      let activeGoalFromProfile = 'Concluir / Baixar Tempo nos 10 km';
-      try {
-        const savedProfile = localStorage.getItem('user_profile');
-        if (savedProfile) {
-          const parsedProfile = JSON.parse(savedProfile);
-          if (parsedProfile.goal || parsedProfile.objective || parsedProfile.main_goal) {
-            activeGoalFromProfile = parsedProfile.goal || parsedProfile.objective || parsedProfile.main_goal;
-          }
-        } else {
-          const directGoal = localStorage.getItem('user_goal') || localStorage.getItem('user_objective');
-          if (directGoal) activeGoalFromProfile = directGoal;
+  // 1. Pega o objetivo atual configurado no Perfil
+  let activeGoalFromProfile = 'Meia Maratona (21.1 km)';
+  try {
+    const savedProfile = localStorage.getItem('user_profile');
+    if (savedProfile) {
+      const parsedProfile = JSON.parse(savedProfile);
+      activeGoalFromProfile = parsedProfile.goal || parsedProfile.objective || parsedProfile.main_goal || activeGoalFromProfile;
+    } else {
+      const directGoal = localStorage.getItem('user_goal') || localStorage.getItem('user_objective');
+      if (directGoal) activeGoalFromProfile = directGoal;
+    }
+  } catch (e) {
+    console.warn('Erro ao ler perfil do localStorage', e);
+  }
+
+  const currentGoalFormatted = formatGoalLabel(activeGoalFromProfile);
+
+  // 2. Estrutura fixa e real baseada nos marcos de data do atleta
+  // Bloqueamos a criação aleatória de semanas passadas
+  const historicalCycles = [
+    {
+      id: 'cycle-active',
+      goal: currentGoalFormatted,
+      status: 'Ativo',
+      startDate: '2026-10-05', // Segunda-feira desta semana
+      endDate: null
+    },
+    {
+      id: 'cycle-weight',
+      goal: 'Perda de Peso Progressiva',
+      status: 'Finalizado',
+      startDate: '2026-09-28',
+      endDate: '2026-10-04'
+    },
+    {
+      id: 'cycle-adaptation',
+      goal: 'Adaptação e Base Inicial',
+      status: 'Finalizado',
+      startDate: '2026-09-01',
+      endDate: '2026-09-27'
+    }
+  ];
+
+  let fullCyclesHtml = '';
+
+  historicalCycles.forEach((cycle) => {
+    const isCurrentCycle = cycle.status === 'Ativo';
+    const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
+    const cycleEndDate = cycle.endDate ? new Date(cycle.endDate + 'T23:59:59') : new Date();
+
+    let weeksHtml = '';
+    let iterMonday = new Date(cycleStartDate);
+    let weekIndex = 1;
+
+    // Se o ciclo já finalizou, renderiza apenas o período de execução dele
+    while (iterMonday <= cycleEndDate) {
+      const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
+      const isCurrentWeek = isCurrentCycle && (new Date() >= iterMonday && new Date() <= iterSunday);
+
+      let weekPhaseName = `Semana ${weekIndex}`;
+      if (isCurrentCycle) {
+        switch (weekIndex) {
+          case 1: weekPhaseName += `: Adaptação Inicial e Base`; break;
+          case 2: weekPhaseName += `: Ritmo e Densidade`; break;
+          case 3: weekPhaseName += `: Pico de Carga`; break;
+          case 4: weekPhaseName += `: Deload / Regenerativa`; break;
         }
-      } catch (e) {
-        console.warn('Erro ao ler perfil do localStorage', e);
+      } else {
+        weekPhaseName += `: Registro de Treinos no Período`;
       }
 
-      const currentGoalFormatted = formatGoalLabel(activeGoalFromProfile);
+      const targetKm = getWeeklyTargetKm(cycle.goal, weekIndex);
+      let kmDone = 0;
+      let weekWorkouts = [];
 
-      // Mantém apenas os ciclos que possuem trocas de objetivos intencionais e evita duplicatas por QA
-      let rawHistory = localStorage.getItem('user_objective_history');
-      let objectiveHistory = [];
-      try {
-        if (rawHistory) objectiveHistory = JSON.parse(rawHistory);
-      } catch (e) {}
+      globalWorkouts.forEach(workout => {
+        const rawDateStr = getWorkoutProp(workout, 'date');
+        if (rawDateStr) {
+          const dateOnly = parseLocalDateStr(rawDateStr);
+          const [yyyy, mm, dd] = dateOnly.split('-').map(Number);
+          const wDate = new Date(yyyy, mm - 1, dd, 12, 0, 0);
 
-      // Remove duplicados do mesmo objetivo se tiver sido criado durante testes
-      const uniqueHistoryMap = new Map();
-      objectiveHistory.forEach(c => {
-        const key = formatGoalLabel(c.goal);
-        if (!uniqueHistoryMap.has(key)) {
-          uniqueHistoryMap.set(key, c);
+          if (wDate >= iterMonday && wDate <= iterSunday) {
+            kmDone += getWorkoutProp(workout, 'distance');
+            weekWorkouts.push(workout);
+          }
         }
       });
 
-      objectiveHistory = Array.from(uniqueHistoryMap.values());
+      const statusTag = isCurrentWeek
+        ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
+        : `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>`;
 
-      // Garante que o objetivo atual selecionado seja o único marcado como ATIVO
-      let activeCycleFound = false;
-      objectiveHistory.forEach(c => {
-        if (formatGoalLabel(c.goal) === currentGoalFormatted) {
-          c.endDate = null; // Ativo
-          activeCycleFound = true;
-        } else {
-          if (!c.endDate) c.endDate = new Date().toISOString().split('T')[0]; // Finalizado
-        }
-      });
+      let workoutsListHtml = weekWorkouts.map(item => {
+        const dist = getWorkoutProp(item, 'distance');
+        const actDate = getWorkoutProp(item, 'date');
+        const dateFormatted = actDate ? parseLocalDateStr(actDate).split('-').reverse().join('/') : '-';
+        const pace = getWorkoutProp(item, 'pace');
+        const type = getWorkoutProp(item, 'type');
 
-      if (!activeCycleFound) {
-        objectiveHistory.push({
-          id: 'cycle-' + Date.now(),
-          goal: currentGoalFormatted,
-          startDate: '2026-09-21',
-          endDate: null
-        });
-      }
-
-      // Atualiza localStorage limpo
-      localStorage.setItem('user_objective_history', JSON.stringify(objectiveHistory));
-
-      let fullCyclesHtml = '';
-
-      // Renderiza apenas o Ciclo Ativo Atual no topo
-      const activeCycle = objectiveHistory.find(c => !c.endDate) || objectiveHistory[objectiveHistory.length - 1];
-      const finishedCycles = objectiveHistory.filter(c => c !== activeCycle);
-
-      const displayCycles = [activeCycle, ...finishedCycles];
-
-      displayCycles.forEach((cycle) => {
-        if (!cycle) return;
-        const isCurrentCycle = !cycle.endDate;
-        const cycleTitleFormatted = formatGoalLabel(cycle.goal);
-        
-        // Regra de data para cada ciclo
-        const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
-        const cycleEndDate = cycle.endDate ? new Date(cycle.endDate + 'T23:59:59') : new Date();
-
-        let weeksHtml = '';
-        let iterMonday = new Date(cycleStartDate);
-        let weekIndex = 1;
-
-        while (iterMonday <= cycleEndDate) {
-          const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
-          const isCurrentWeek = isCurrentCycle && (new Date() >= iterMonday && new Date() <= iterSunday);
-
-          let weekPhaseName = `Semana ${weekIndex}`;
-          switch (((weekIndex - 1) % 4) + 1) {
-            case 1: weekPhaseName += `: Adaptação Inicial e Base`; break;
-            case 2: weekPhaseName += `: Ritmo e Densidade`; break;
-            case 3: weekPhaseName += `: Pico de Carga`; break;
-            case 4: weekPhaseName += `: Deload / Regenerativa`; break;
-          }
-
-          const targetKm = getWeeklyTargetKm(cycle.goal, weekIndex);
-          let kmDone = 0;
-          let weekWorkouts = [];
-
-          globalWorkouts.forEach(workout => {
-            const rawDateStr = getWorkoutProp(workout, 'date');
-            if (rawDateStr) {
-              const dateOnly = parseLocalDateStr(rawDateStr);
-              const [yyyy, mm, dd] = dateOnly.split('-').map(Number);
-              const wDate = new Date(yyyy, mm - 1, dd, 12, 0, 0);
-
-              if (wDate >= iterMonday && wDate <= iterSunday) {
-                kmDone += getWorkoutProp(workout, 'distance');
-                weekWorkouts.push(workout);
-              }
-            }
-          });
-
-          const statusTag = isCurrentWeek
-            ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
-            : `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>`;
-
-          let workoutsListHtml = weekWorkouts.map(item => {
-            const dist = getWorkoutProp(item, 'distance');
-            const actDate = getWorkoutProp(item, 'date');
-            const dateFormatted = actDate ? parseLocalDateStr(actDate).split('-').reverse().join('/') : '-';
-            const pace = getWorkoutProp(item, 'pace');
-            const type = getWorkoutProp(item, 'type');
-
-            return `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 6px; font-size: 13px;">
-                <div>
-                  <strong style="color: var(--text-main);">${item.title || 'Treino'}</strong>
-                  <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${type})</span>
-                </div>
-                <div style="display: flex; gap: 15px; color: var(--text-muted);">
-                  <span>📏 <strong>${dist.toFixed(1)} km</strong></span>
-                  <span>⚡ Pace: <strong>${pace}</strong></span>
-                </div>
-              </div>
-            `;
-          }).join('');
-
-          const weekUid = `${cycle.id}-w${weekIndex}`;
-
-          weeksHtml += `
-            <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div>
-                  <strong style="color: var(--text-main);">${isCurrentWeek ? 'Semana Atual: Bloco Ativo (' + weekPhaseName + ')' : weekPhaseName}</strong>
-                  <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                    ${isCurrentWeek ? 'Foco configurado no perfil do atleta' : 'Registro Finalizado do Ciclo'}
-                  </div>
-                </div>
-                <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
-                  <span>Alvo Base: <strong>${targetKm.toFixed(2)} km</strong></span>
-                  <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
-                  ${statusTag}
-                  <span id="arrow-week-${weekUid}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">${isCurrentWeek ? '▼' : '▲'}</span>
-                </div>
-              </div>
-              
-              <div id="details-week-${weekUid}" style="display: ${isCurrentWeek ? 'block' : 'none'}; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
-                <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas:</div>
-                ${workoutsListHtml || '<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>'}
-              </div>
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-top: 6px; font-size: 13px;">
+            <div>
+              <strong style="color: var(--text-main);">${item.title || 'Treino'}</strong>
+              <span style="color: var(--text-muted); font-size: 11px; margin-left: 8px;">(${dateFormatted} - ${type})</span>
             </div>
-          `;
-
-          iterMonday.setDate(iterMonday.getDate() + 7);
-          weekIndex++;
-        }
-
-        const badgeTag = isCurrentCycle
-          ? `<span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>`
-          : `<span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">Finalizado</span>`;
-
-        fullCyclesHtml += `
-          <div class="cycle-block">
-            <div class="cycle-title">
-              <span>🎯 Ciclo: ${cycleTitleFormatted}</span>
-              ${badgeTag}
+            <div style="display: flex; gap: 15px; color: var(--text-muted);">
+              <span>📏 <strong>${dist.toFixed(1)} km</strong></span>
+              <span>⚡ Pace: <strong>${pace}</strong></span>
             </div>
-            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
-              Acompanhamento do progresso semanal baseado na sua diretriz de treinamento atual.
-            </p>
-            <div>${weeksHtml}</div>
           </div>
         `;
-      });
+      }).join('');
 
-      cyclesContainer.innerHTML = fullCyclesHtml;
+      const weekUid = `${cycle.id}-w${weekIndex}`;
+
+      weeksHtml += `
+        <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <strong style="color: var(--text-main);">${isCurrentWeek ? 'Semana Atual: Bloco Ativo (' + weekPhaseName + ')' : weekPhaseName}</strong>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                Período: ${iterMonday.toLocaleDateString('pt-BR')} até ${iterSunday.toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+            <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
+              <span>Alvo Base: <strong>${targetKm.toFixed(2)} km</strong></span>
+              <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
+              ${statusTag}
+              <span id="arrow-week-${weekUid}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">${isCurrentWeek ? '▼' : '▲'}</span>
+            </div>
+          </div>
+          
+          <div id="details-week-${weekUid}" style="display: ${isCurrentWeek ? 'block' : 'none'}; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+            <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas:</div>
+            ${workoutsListHtml || '<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>'}
+          </div>
+        </div>
+      `;
+
+      iterMonday.setDate(iterMonday.getDate() + 7);
+      weekIndex++;
     }
+
+    const badgeTag = isCurrentCycle
+      ? `<span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>`
+      : `<span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">Finalizado</span>`;
+
+    fullCyclesHtml += `
+      <div class="cycle-block">
+        <div class="cycle-title">
+          <span>🎯 Ciclo: ${cycle.goal}</span>
+          ${badgeTag}
+        </div>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
+          Acompanhamento do progresso semanal baseado na sua diretriz de treinamento.
+        </p>
+        <div>${weeksHtml}</div>
+      </div>
+    `;
+  });
+
+  cyclesContainer.innerHTML = fullCyclesHtml;
+}
 
     function toggleWeekDetails(weekUid) {
       const detailsEl = document.getElementById(`details-week-${weekUid}`);
