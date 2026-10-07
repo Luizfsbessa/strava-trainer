@@ -169,55 +169,34 @@
       const cyclesContainer = document.getElementById('cycles-list-container');
       if (!cyclesContainer) return;
 
-      let currentGoal = "Concluir / Baixar Tempo nos 5 km";
-
-      // 1. Resgata o objetivo do perfil
-      const savedObjective = localStorage.getItem('user_objective');
-      if (savedObjective) {
-        currentGoal = savedObjective;
-      } else {
-        try {
-          const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
-          if (appState.profile && (appState.profile.objectiveText || appState.profile.objective)) {
-            currentGoal = appState.profile.objectiveText || appState.profile.objective;
-          }
-        } catch (e) {
-          console.warn('Erro ao ler estado do localStorage:', e);
+      // 1. Resgata o histórico de objetivos salvos no perfil
+      let cycleHistory = [];
+      try {
+        const storedHistory = localStorage.getItem('user_objective_history');
+        if (storedHistory) {
+          cycleHistory = JSON.parse(storedHistory);
         }
+      } catch (e) {
+        console.warn('Erro ao carregar histórico de objetivos:', e);
+      }
+
+      // Se não houver histórico gravado ainda, monta com base na configuração atual do perfil
+      if (!cycleHistory || cycleHistory.length === 0) {
+        let currentGoal = localStorage.getItem('user_objective') || "Concluir / Baixar Tempo nos 5 km";
+        cycleHistory = [
+          { id: 'c-active', goalName: currentGoal, startDate: '2026-10-05', endDate: null },
+          { id: 'c-weight-loss', goalName: 'Perda de Peso Progressiva', startDate: '2026-09-28', endDate: '2026-10-04' },
+          { id: 'c-base', goalName: 'Adaptação e Base Inicial', startDate: '2026-06-01', endDate: '2026-09-27' }
+        ];
       }
 
       const appState = JSON.parse(localStorage.getItem('strava_trainer_state') || '{}');
       const targetVolumeBase = Number(appState.targetVolume || appState.weeklyTargetKm || 21.7);
 
-      // Definição dos 3 Blocos/Ciclos Reais por Data
-      const cycleBlocks = [
-        {
-          id: 'c-active',
-          goalName: currentGoal,
-          isActive: true,
-          startDate: '2026-10-05', // Segunda-feira desta semana
-          endDate: null
-        },
-        {
-          id: 'c-weight-loss',
-          goalName: 'Perda de Peso Progressiva',
-          isActive: false,
-          startDate: '2026-09-28',
-          endDate: '2026-10-04'
-        },
-        {
-          id: 'c-base',
-          goalName: 'Adaptação e Base Inicial',
-          isActive: false,
-          startDate: '2026-06-01',
-          endDate: '2026-09-27'
-        }
-      ];
-
       let fullCyclesHtml = '';
 
-      cycleBlocks.forEach((cycle) => {
-        const isCurrentCycle = cycle.isActive;
+      cycleHistory.forEach((cycle, index) => {
+        const isCurrentCycle = index === 0; // O primeiro do histórico é sempre o atual
         const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
         const cycleEndDate = cycle.endDate ? new Date(cycle.endDate + 'T23:59:59') : new Date();
 
@@ -225,20 +204,11 @@
         let iterMonday = new Date(cycleStartDate);
         let weekIndex = 1;
 
-        // Se o ciclo já finalizou, renderiza apenas o período dele; se for o ativo, vai até a semana atual
         while (iterMonday <= cycleEndDate) {
           const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
           const isCurrentWeek = isCurrentCycle && (new Date() >= iterMonday && new Date() <= iterSunday);
 
-          let weekTitle = `Semana ${weekIndex}`;
-          if (isCurrentCycle) {
-            weekTitle = isCurrentWeek 
-              ? `Semana Atual: Bloco Ativo (Semana ${weekIndex}: Ritmo e Densidade)`
-              : `Semana ${weekIndex}: Adaptação / Bloco Anterior`;
-          } else {
-            weekTitle = `Semana ${weekIndex}: Registro de Treinos`;
-          }
-
+          // Filtra atividades realizadas DENTRO desta semana
           let kmDone = 0;
           let weekWorkouts = [];
 
@@ -255,6 +225,17 @@
               }
             }
           });
+
+          // REGRA DE SUPRESSÃO: Se a semana não tiver treinos E não for a semana atual do ciclo ativo, ignora e NÃO exibe
+          if (weekWorkouts.length === 0 && !isCurrentWeek) {
+            iterMonday.setDate(iterMonday.getDate() + 7);
+            weekIndex++;
+            continue;
+          }
+
+          let weekTitle = isCurrentCycle
+            ? (isCurrentWeek ? `Semana Atual: Bloco Ativo (Semana ${weekIndex})` : `Semana ${weekIndex}: Bloco Anterior`)
+            : `Semana ${weekIndex}: Registro de Treinos`;
 
           const statusTag = isCurrentWeek
             ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
@@ -285,7 +266,7 @@
             workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
           }
 
-          const weekUid = `${cycle.id}-w${weekIndex}`;
+          const weekUid = `${cycle.id || index}-w${weekIndex}`;
 
           weeksHtml = `
             <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
@@ -309,11 +290,14 @@
                 ${workoutsListHtml}
               </div>
             </div>
-          ` + weeksHtml; // Empilha a semana mais recente no topo do ciclo
+          ` + weeksHtml;
 
           iterMonday.setDate(iterMonday.getDate() + 7);
           weekIndex++;
         }
+
+        // Se o ciclo não teve nenhuma semana com treino, não exibe o card do ciclo inteiro
+        if (!weeksHtml && !isCurrentCycle) return;
 
         const badgeTag = isCurrentCycle
           ? `<span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>`

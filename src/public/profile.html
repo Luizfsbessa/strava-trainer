@@ -48,7 +48,7 @@
     <header>
       <div>
         <h1>Configuração de Perfil</h1>
-        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de esforço.</div>
+        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de effort.</div>
       </div>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
@@ -139,7 +139,6 @@
       const fcMax = 220 - age;
       document.getElementById('fcmax-subtitle').innerText = `Baseado na sua idade (${age} anos) • FCMax estimada: ${fcMax} bpm (Fórmula: 220 - idade)`;
 
-      // Função auxiliar para formatar segundos em MM:SS
       const formatPace = (sec) => {
         if (sec <= 0) return "0:00";
         const m = Math.floor(sec / 60);
@@ -286,7 +285,7 @@
     }
 
     async function loadProfile() {
-      let basePaceSec = 442; // Padrão 7:22 /km
+      let basePaceSec = 442;
 
       const saved = localStorage.getItem('strava_trainer_state');
       if (saved) {
@@ -342,6 +341,47 @@
       await loadWeightChart();
     }
 
+    // Função de gerenciamento do Histórico de Objetivos/Ciclos
+    function saveObjectiveHistory(newGoalText) {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      let history = [];
+
+      try {
+        const storedHistory = localStorage.getItem('user_objective_history');
+        if (storedHistory) {
+          history = JSON.parse(storedHistory);
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar histórico de ciclos:', e);
+      }
+
+      // Se ainda não existia histórico gravado, inicializa com a base conhecida
+      if (history.length === 0) {
+        history = [
+          { id: 'c-active', goalName: newGoalText, startDate: '2026-10-05', endDate: null },
+          { id: 'c-weight-loss', goalName: 'Perda de Peso Progressiva', startDate: '2026-09-28', endDate: '2026-10-04' },
+          { id: 'c-base', goalName: 'Adaptação e Base Inicial', startDate: '2026-06-01', endDate: '2026-09-27' }
+        ];
+      } else {
+        // Se o objetivo mudou em relação ao objetivo ativo atual
+        const currentActive = history[0];
+        if (currentActive && currentActive.goalName !== newGoalText) {
+          // Encerra o ciclo anterior na data de hoje
+          currentActive.endDate = todayStr;
+
+          // Insere o novo ciclo no topo da lista como o Ativo
+          history.unshift({
+            id: 'c-' + Date.now(),
+            goalName: newGoalText,
+            startDate: todayStr,
+            endDate: null
+          });
+        }
+      }
+
+      localStorage.setItem('user_objective_history', JSON.stringify(history));
+    }
+
     async function saveProfile(event) {
       event.preventDefault();
       const birthDateVal = document.getElementById('pBirthDate').value;
@@ -352,7 +392,9 @@
       const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
       const ageVal = calculateAge(birthDateVal);
 
+      // Atualiza o objetivo e registra a transição de ciclo automaticamente
       localStorage.setItem('user_objective', objectiveText);
+      saveObjectiveHistory(objectiveText);
 
       const saved = localStorage.getItem('strava_trainer_state');
       let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
@@ -382,7 +424,7 @@
         console.error('Erro ao enviar dados para a API:', e);
       }
 
-      alert('Perfil atualizado com sucesso! Zonas de esforço e parâmetros recalculados.');
+      alert('Perfil atualizado com sucesso! Zonas de esforço e ciclo de treino sincronizados.');
       await loadWeightChart();
     }
 
