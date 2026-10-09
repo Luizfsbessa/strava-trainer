@@ -29,16 +29,17 @@ export class GpxService {
           const t2 = new Date(p.time).getTime();
           const diffSecs = (t2 - t1) / 1000;
 
-          // AJUSTE: Considera pausa se a diferença de tempo for > 5s ou se a velocidade for irreal/muito baixa
-          if (diffSecs > 0 && diffSecs <= 5) {
-            const speed = dist / diffSecs; // m/s
-            
-            // Só acumula se a velocidade for humana para corrida (> 0.5 m/s e < 8.3 m/s)
-            if (speed >= 0.5 && speed <= 8.33) {
+          // Se a pausa for superior a 15s (ex: auto-pause ou pausa manual), desconsidera a transição
+          if (diffSecs > 0 && diffSecs <= 15) {
+            // Filtro apenas contra saltos de GPS irrealistas (acima de 45 km/h ou teletransporte)
+            if (dist < 150) { 
               totalDistanceMeters += dist;
               movingSeconds += diffSecs;
             }
           }
+        } else {
+          // Se não houver timestamp nos pontos, soma a distância se for viável
+          if (dist < 150) totalDistanceMeters += dist;
         }
       }
       lastPoint = p;
@@ -46,7 +47,7 @@ export class GpxService {
 
     const splits: any[] = [];
 
-    // 1. Tenta buscar tags <lap> nativas via Regex
+    // 1. Tenta buscar tags <lap> nativas via Regex (Voltas manuais marcadas no relógio)
     const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
     let lapMatch;
     let lapIndex = 1;
@@ -79,7 +80,7 @@ export class GpxService {
       });
     }
 
-    // 2. Se não houver <lap>, verifica se o GPX possui múltiplos segmentos (<trkseg>)
+    // 2. Se não houver <lap>, verifica segmentos (<trkseg>) explícitos do GPX
     const trackAny = track as any;
     if (splits.length === 0 && trackAny.segments && trackAny.segments.length > 1) {
       trackAny.segments.forEach((segPoints: any[], segIdx: number) => {
@@ -92,19 +93,16 @@ export class GpxService {
             const dist = GpxService.haversineDistance(segPrev.lat, segPrev.lon, p.lat, p.lon);
             const diff = (new Date(p.time).getTime() - new Date(segPrev.time).getTime()) / 1000;
             
-            if (diff > 0 && diff <= 5) {
-              const speed = dist / diff;
-              if (speed >= 0.5 && speed <= 8.33) {
-                segDistMeters += dist;
-                segSecs += diff;
-              }
+            if (diff > 0 && diff <= 15 && dist < 150) {
+              segDistMeters += dist;
+              segSecs += diff;
             }
           }
           segPrev = p;
         });
 
         const segDistKm = segDistMeters / 1000;
-        if (segDistKm > 0.02) {
+        if (segDistKm > 0.05) {
           const lMin = Math.floor(segSecs / 60);
           const lSec = Math.round(segSecs % 60);
           let segPace = '00:00';
@@ -125,72 +123,7 @@ export class GpxService {
       });
     }
 
-    // 3. Deteta tiros/intervalos analisando pausas ou recuperações (> 10 segundos entre pontos)
-    if (splits.length === 0) {
-      let intervalSegments: any[] = [];
-      let currentSegPoints: any[] = [];
-
-      for (let i = 0; i < validPoints.length; i++) {
-        const p = validPoints[i];
-        currentSegPoints.push(p);
-
-        if (i > 0 && validPoints[i - 1].time && p.time) {
-          const diffSecs = (new Date(p.time).getTime() - new Date(validPoints[i - 1].time).getTime()) / 1000;
-          if (diffSecs > 10 && currentSegPoints.length > 5) {
-            intervalSegments.push([...currentSegPoints]);
-            currentSegPoints = [p];
-          }
-        }
-      }
-      if (currentSegPoints.length > 0) {
-        intervalSegments.push(currentSegPoints);
-      }
-
-      if (intervalSegments.length > 1) {
-        intervalSegments.forEach((segPts, sIdx) => {
-          let segDist = 0;
-          let segSecs = 0;
-          let prev: any = null;
-          segPts.forEach(pt => {
-            if (prev && prev.time && pt.time) {
-              const d = GpxService.haversineDistance(prev.lat, prev.lon, pt.lat, pt.lon);
-              const tDiff = (new Date(pt.time).getTime() - new Date(prev.time).getTime()) / 1000;
-              
-              if (tDiff > 0 && tDiff <= 5) {
-                const spd = d / tDiff;
-                if (spd >= 0.5 && spd <= 8.33) {
-                  segDist += d;
-                  segSecs += tDiff;
-                }
-              }
-            }
-            prev = pt;
-          });
-
-          const distKm = segDist / 1000;
-          if (distKm > 0.05) {
-            const m = Math.floor(segSecs / 60);
-            const s = Math.round(segSecs % 60);
-            let paceStr = '00:00';
-            if (distKm > 0 && segSecs > 0) {
-              const spk = segSecs / distKm;
-              const pm = Math.floor(spk / 60);
-              const ps = Math.round(spk % 60);
-              paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps} /km`;
-            }
-
-            splits.push({
-              lap_index: sIdx + 1,
-              distance_km: Number(distKm.toFixed(2)),
-              moving_time_formatted: `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`,
-              pace: paceStr
-            });
-          }
-        });
-      }
-    }
-
-    // 4. Fallback final por KM caso nenhum critério anterior se aplique
+    // 3. Fallback Padrão: Divisão precisa a cada 1.0 km (evita criar laps arbitrários por falha de sinal)
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
@@ -203,39 +136,49 @@ export class GpxService {
           const dist = GpxService.haversineDistance(prevPoint.lat, prevPoint.lon, p.lat, p.lon);
           const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
 
-          if (diffSecs > 0 && diffSecs <= 5) {
-            const speed = dist / diffSecs;
-            if (speed >= 0.5 && speed <= 8.33) {
-              currentSplitDist += dist;
-              currentSplitSecs += diffSecs;
+          if (diffSecs > 0 && diffSecs <= 15 && dist < 150) {
+            currentSplitDist += dist;
+            currentSplitSecs += diffSecs;
 
-              while (currentSplitDist >= 1000) {
-                const lapMin = Math.floor(currentSplitSecs / 60);
-                const lapSec = Math.round(currentSplitSecs % 60);
-                splits.push({
-                  lap_index: splitIndex++,
-                  distance_km: 1.0,
-                  moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-                  pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
-                });
-                currentSplitDist -= 1000;
-                currentSplitSecs = 0;
-              }
+            while (currentSplitDist >= 1000) {
+              const lapMin = Math.floor(currentSplitSecs / 60);
+              const lapSec = Math.round(currentSplitSecs % 60);
+              const paceSecs = currentSplitSecs / (currentSplitDist / 1000); 
+              const pMin = Math.floor(paceSecs / 60);
+              const pSec = Math.round(paceSecs % 60);
+
+              splits.push({
+                lap_index: splitIndex++,
+                distance_km: 1.0,
+                moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+                pace: `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`
+              });
+              currentSplitDist -= 1000;
+              currentSplitSecs = 0;
             }
           }
         }
         prevPoint = p;
       }
 
-      if (currentSplitDist > 20) {
+      // Restante final se houver mais de 50 metros no último bloco
+      if (currentSplitDist > 50) {
         const remKm = currentSplitDist / 1000;
         const lapMin = Math.floor(currentSplitSecs / 60);
         const lapSec = Math.round(currentSplitSecs % 60);
+        let paceStr = '00:00';
+        if (remKm > 0 && currentSplitSecs > 0) {
+          const spk = currentSplitSecs / remKm;
+          const pm = Math.floor(spk / 60);
+          const ps = Math.round(spk % 60);
+          paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps} /km`;
+        }
+
         splits.push({
           lap_index: splitIndex,
           distance_km: Number(remKm.toFixed(2)),
           moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-          pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+          pace: paceStr
         });
       }
     }
