@@ -29,17 +29,15 @@ export class GpxService {
           const t2 = new Date(p.time).getTime();
           const diffSecs = (t2 - t1) / 1000;
 
-          // Se a pausa for superior a 15s (ex: auto-pause ou pausa manual), desconsidera a transição
-          if (diffSecs > 0 && diffSecs <= 15) {
-            // Filtro apenas contra saltos de GPS irrealistas (acima de 45 km/h ou teletransporte)
-            if (dist < 150) { 
+          // Se o salto temporal for maior que 20s (ex: pausa manual longa), ignora o gap
+          if (diffSecs > 0 && diffSecs <= 20) {
+            if (dist < 200) { 
               totalDistanceMeters += dist;
               movingSeconds += diffSecs;
             }
           }
         } else {
-          // Se não houver timestamp nos pontos, soma a distância se for viável
-          if (dist < 150) totalDistanceMeters += dist;
+          if (dist < 200) totalDistanceMeters += dist;
         }
       }
       lastPoint = p;
@@ -47,10 +45,10 @@ export class GpxService {
 
     const splits: any[] = [];
 
-    // 1. Tenta buscar tags <lap> nativas via Regex (Voltas manuais marcadas no relógio)
+    // 1. Tenta extrair laps nativos (<lap>) via Regex
     const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
     let lapMatch;
-    let lapIndex = 1;
+    let lapIndex = 0; // Começa em 0 para bater exatamente com a tabela do Strava (Volta 0, Volta 1...)
 
     while ((lapMatch = lapRegex.exec(gpxString)) !== null) {
       const lapContent = lapMatch[1];
@@ -80,50 +78,66 @@ export class GpxService {
       });
     }
 
-    // 2. Se não houver <lap>, verifica segmentos (<trkseg>) explícitos do GPX
-    const trackAny = track as any;
-    if (splits.length === 0 && trackAny.segments && trackAny.segments.length > 1) {
-      trackAny.segments.forEach((segPoints: any[], segIdx: number) => {
-        let segDistMeters = 0;
-        let segSecs = 0;
-        let segPrev: any = null;
+    // 2. Se não houver <lap>, extrai os segmentos explícitos do GPX (<trkseg>)
+    // O Strava/Garmin salva cada clique de "Lap" como um <trkseg> novo no GPX!
+    if (splits.length === 0) {
+      const trksegMatches = gpxString.match(/<trkseg>([\s\S]*?)<\/trkseg>/gi);
 
-        segPoints.forEach(p => {
-          if (segPrev && segPrev.time && p.time) {
-            const dist = GpxService.haversineDistance(segPrev.lat, segPrev.lon, p.lat, p.lon);
-            const diff = (new Date(p.time).getTime() - new Date(segPrev.time).getTime()) / 1000;
-            
-            if (diff > 0 && diff <= 15 && dist < 150) {
-              segDistMeters += dist;
-              segSecs += diff;
+      if (trksegMatches && trksegMatches.length > 1) {
+        trksegMatches.forEach((segXml, segIdx) => {
+          // Extrai os pontos deste segmento específico
+          const trkptRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[\s\S]*?(?:<time>([^<]+)<\/time>)?/gi;
+          let ptMatch;
+          let segDistMeters = 0;
+          let segSecs = 0;
+          let prevPt: any = null;
+
+          while ((ptMatch = trkptRegex.exec(segXml)) !== null) {
+            const currentPt = {
+              lat: parseFloat(ptMatch[1]),
+              lon: parseFloat(ptMatch[2]),
+              time: ptMatch[3] ? ptMatch[3] : null
+            };
+
+            if (prevPt) {
+              const d = GpxService.haversineDistance(prevPt.lat, prevPt.lon, currentPt.lat, currentPt.lon);
+              if (prevPt.time && currentPt.time) {
+                const diff = (new Date(currentPt.time).getTime() - new Date(prevPt.time).getTime()) / 1000;
+                if (diff > 0 && diff <= 20 && d < 200) {
+                  segDistMeters += d;
+                  segSecs += diff;
+                }
+              } else if (d < 200) {
+                segDistMeters += d;
+              }
             }
+            prevPt = currentPt;
           }
-          segPrev = p;
+
+          const segDistKm = segDistMeters / 1000;
+          if (segDistKm > 0.01) {
+            const lMin = Math.floor(segSecs / 60);
+            const lSec = Math.round(segSecs % 60);
+            let segPace = '00:00';
+            if (segDistKm > 0 && segSecs > 0) {
+              const secPerKm = segSecs / segDistKm;
+              const pMin = Math.floor(secPerKm / 60);
+              const pSec = Math.round(secPerKm % 60);
+              segPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
+            }
+
+            splits.push({
+              lap_index: segIdx, // 0, 1, 2, ...
+              distance_km: Number(segDistKm.toFixed(2)),
+              moving_time_formatted: `${lMin < 10 ? '0' : ''}${lMin}:${lSec < 10 ? '0' : ''}${lSec}`,
+              pace: segPace
+            });
+          }
         });
-
-        const segDistKm = segDistMeters / 1000;
-        if (segDistKm > 0.05) {
-          const lMin = Math.floor(segSecs / 60);
-          const lSec = Math.round(segSecs % 60);
-          let segPace = '00:00';
-          if (segDistKm > 0 && segSecs > 0) {
-            const secPerKm = segSecs / segDistKm;
-            const pMin = Math.floor(secPerKm / 60);
-            const pSec = Math.round(secPerKm % 60);
-            segPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
-          }
-
-          splits.push({
-            lap_index: segIdx + 1,
-            distance_km: Number(segDistKm.toFixed(2)),
-            moving_time_formatted: `${lMin < 10 ? '0' : ''}${lMin}:${lSec < 10 ? '0' : ''}${lSec}`,
-            pace: segPace
-          });
-        }
-      });
+      }
     }
 
-    // 3. Fallback Padrão: Divisão precisa a cada 1.0 km (evita criar laps arbitrários por falha de sinal)
+    // 3. Fallback de emergência (se o GPX for um bloco único sem <lap> nem <trkseg>)
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
@@ -136,7 +150,7 @@ export class GpxService {
           const dist = GpxService.haversineDistance(prevPoint.lat, prevPoint.lon, p.lat, p.lon);
           const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
 
-          if (diffSecs > 0 && diffSecs <= 15 && dist < 150) {
+          if (diffSecs > 0 && diffSecs <= 20 && dist < 200) {
             currentSplitDist += dist;
             currentSplitSecs += diffSecs;
 
@@ -161,7 +175,6 @@ export class GpxService {
         prevPoint = p;
       }
 
-      // Restante final se houver mais de 50 metros no último bloco
       if (currentSplitDist > 50) {
         const remKm = currentSplitDist / 1000;
         const lapMin = Math.floor(currentSplitSecs / 60);
