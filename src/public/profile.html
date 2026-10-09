@@ -48,7 +48,7 @@
     <header>
       <div>
         <h1>Configuração de Perfil</h1>
-        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de effort.</div>
+        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de esforço.</div>
       </div>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
@@ -287,99 +287,29 @@
     async function loadProfile() {
       let basePaceSec = 442;
 
-      const saved = localStorage.getItem('strava_trainer_state');
-      if (saved) {
-        const data = JSON.parse(saved);
-        if (data.profile) {
-          let defaultBirth = '1987-01-01';
-          if (data.profile.birthDate) {
-            defaultBirth = data.profile.birthDate;
-          } else if (data.profile.age) {
-            const currentYear = new Date().getFullYear();
-            const estimatedYear = currentYear - data.profile.age;
-            defaultBirth = `${estimatedYear}-01-01`;
-          }
-
-          document.getElementById('pBirthDate').value = defaultBirth;
-          document.getElementById('pWeight').value = data.profile.currentWeight || 103;
-          document.getElementById('pTargetWeight').value = data.profile.targetWeight || 92.7;
-          document.getElementById('pObjective').value = data.profile.objective || "perda_peso";
-          
-          if (data.profile.basePaceSeconds) {
-            basePaceSec = data.profile.basePaceSeconds;
-          }
-
-          const calculatedAge = calculateAge(defaultBirth);
-          updateZonesTable(calculatedAge, basePaceSec);
-        }
-      }
-
       try {
         const res = await fetch('/api/user/profile');
         if (res.ok) {
           const apiData = await res.json();
           if (apiData.profile) {
-            document.getElementById('pWeight').value = apiData.profile.weightKg;
-            if (apiData.profile.basePaceSeconds) {
-              basePaceSec = apiData.profile.basePaceSeconds;
+            document.getElementById('pWeight').value = apiData.profile.weightKg || 103;
+            if (apiData.profile.targetWeight) {
+              document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
             }
             if (apiData.profile.age) {
               const currentYear = new Date().getFullYear();
               const estimatedYear = currentYear - apiData.profile.age;
-              if (!document.getElementById('pBirthDate').value) {
-                document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
-              }
+              document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
             }
             const currentAge = calculateAge(document.getElementById('pBirthDate').value);
             updateZonesTable(currentAge, basePaceSec);
           }
         }
       } catch (e) {
-        console.log('Sem conexão com API local ou modo offline.');
+        console.log('Sem conexão com API local.');
       }
 
       await loadWeightChart();
-    }
-
-    // Função de gerenciamento do Histórico de Objetivos/Ciclos
-    function saveObjectiveHistory(newGoalText) {
-      const todayStr = new Date().toISOString().substring(0, 10);
-      let history = [];
-
-      try {
-        const storedHistory = localStorage.getItem('user_objective_history');
-        if (storedHistory) {
-          history = JSON.parse(storedHistory);
-        }
-      } catch (e) {
-        console.warn('Erro ao carregar histórico de ciclos:', e);
-      }
-
-      // Se ainda não existia histórico gravado, inicializa com a base conhecida
-      if (history.length === 0) {
-        history = [
-          { id: 'c-active', goalName: newGoalText, startDate: '2026-10-05', endDate: null },
-          { id: 'c-weight-loss', goalName: 'Perda de Peso Progressiva', startDate: '2026-09-28', endDate: '2026-10-04' },
-          { id: 'c-base', goalName: 'Adaptação e Base Inicial', startDate: '2026-06-01', endDate: '2026-09-27' }
-        ];
-      } else {
-        // Se o objetivo mudou em relação ao objetivo ativo atual
-        const currentActive = history[0];
-        if (currentActive && currentActive.goalName !== newGoalText) {
-          // Encerra o ciclo anterior na data de hoje
-          currentActive.endDate = todayStr;
-
-          // Insere o novo ciclo no topo da lista como o Ativo
-          history.unshift({
-            id: 'c-' + Date.now(),
-            goalName: newGoalText,
-            startDate: todayStr,
-            endDate: null
-          });
-        }
-      }
-
-      localStorage.setItem('user_objective_history', JSON.stringify(history));
     }
 
     async function saveProfile(event) {
@@ -392,23 +322,8 @@
       const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
       const ageVal = calculateAge(birthDateVal);
 
-      // Atualiza o objetivo e registra a transição de ciclo automaticamente
-      localStorage.setItem('user_objective', objectiveText);
-      saveObjectiveHistory(objectiveText);
-
-      const saved = localStorage.getItem('strava_trainer_state');
-      let data = saved ? JSON.parse(saved) : { workouts: [], sessions: [] };
-      if (!data.profile) data.profile = {};
-      
-      data.profile.birthDate = birthDateVal;
-      data.profile.age = ageVal;
-      data.profile.currentWeight = weightVal;
-      data.profile.targetWeight = targetWeightVal;
-      data.profile.objective = objectiveVal;
-      data.profile.objectiveText = objectiveText;
-      localStorage.setItem('strava_trainer_state', JSON.stringify(data));
-
       try {
+        // 1. Atualiza Perfil Antropométrico do Usuário
         await fetch('/api/user/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -420,11 +335,20 @@
             goal: objectiveVal === 'perda_peso' ? 'WEIGHT_LOSS' : 'MAINTENANCE'
           })
         });
+
+        // 2. Transição do Ciclo diretamente no Banco Neon/PostgreSQL via Prisma
+        await fetch('/api/user/cycles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goalName: objectiveText })
+        });
+
+        alert('Perfil e Ciclo salvos no Banco de Dados com sucesso!');
       } catch (e) {
-        console.error('Erro ao enviar dados para a API:', e);
+        console.error('Erro ao salvar dados:', e);
+        alert('Erro ao salvar no banco de dados.');
       }
 
-      alert('Perfil atualizado com sucesso! Zonas de esforço e ciclo de treino sincronizados.');
       await loadWeightChart();
     }
 

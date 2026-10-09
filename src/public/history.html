@@ -141,7 +141,7 @@
     <!-- Aba 2: Linha do Tempo de Ciclos (Agrupada por Ciclos/Cards Próprios) -->
     <div id="pane-cycles" class="tab-pane">
       <div id="cycles-list-container">
-        <!-- Renderização dinâmica dos Cards de Ciclos -->
+        <!-- Renderização dinâmica dos Cards de Ciclos vindos da API PostgreSQL -->
       </div>
     </div>
 
@@ -169,22 +169,22 @@
       const cyclesContainer = document.getElementById('cycles-list-container');
       if (!cyclesContainer) return;
 
-      // 1. Resgata o histórico de objetivos salvos no perfil
       let cycleHistory = [];
+
+      // 1. Consome o histórico de ciclos diretamente da API Node/Prisma
       try {
-        const storedHistory = localStorage.getItem('user_objective_history');
-        if (storedHistory) {
-          cycleHistory = JSON.parse(storedHistory);
+        const res = await fetch('/api/user/cycles');
+        if (res.ok) {
+          cycleHistory = await res.json();
         }
       } catch (e) {
-        console.warn('Erro ao carregar histórico de objetivos:', e);
+        console.warn('Erro ao carregar histórico de ciclos do banco:', e);
       }
 
-      // Se não houver histórico gravado ainda, monta com base na configuração atual do perfil
+      // Se a tabela ainda não possuir registros, utiliza a estrutura inicial
       if (!cycleHistory || cycleHistory.length === 0) {
-        let currentGoal = localStorage.getItem('user_objective') || "Concluir / Baixar Tempo nos 5 km";
         cycleHistory = [
-          { id: 'c-active', goalName: currentGoal, startDate: '2026-10-05', endDate: null },
+          { id: 'c-active', goalName: "Concluir / Baixar Tempo nos 5 km", startDate: '2026-10-05', endDate: null },
           { id: 'c-weight-loss', goalName: 'Perda de Peso Progressiva', startDate: '2026-09-28', endDate: '2026-10-04' },
           { id: 'c-base', goalName: 'Adaptação e Base Inicial', startDate: '2026-06-01', endDate: '2026-09-27' }
         ];
@@ -196,11 +196,12 @@
       let fullCyclesHtml = '';
 
       cycleHistory.forEach((cycle, index) => {
-        const isCurrentCycle = index === 0; // O primeiro do histórico é sempre o atual
-        const cycleStartDate = new Date(cycle.startDate + 'T00:00:00');
-        const cycleEndDate = cycle.endDate ? new Date(cycle.endDate + 'T23:59:59') : new Date();
+        const isCurrentCycle = index === 0; // O primeiro retornado pela API (ordenado por startDate DESC) é o ativo
+        const cycleName = cycle.goalName || cycle.title || "Ciclo de Treinamento";
+        const cycleStartDate = new Date(cycle.startDate);
+        const cycleEndDate = cycle.endDate ? new Date(cycle.endDate) : new Date();
 
-        let weeksHtml = '';
+        let weeksList = [];
         let iterMonday = new Date(cycleStartDate);
         let weekIndex = 1;
 
@@ -208,7 +209,6 @@
           const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
           const isCurrentWeek = isCurrentCycle && (new Date() >= iterMonday && new Date() <= iterSunday);
 
-          // Filtra atividades realizadas DENTRO desta semana
           let kmDone = 0;
           let weekWorkouts = [];
 
@@ -226,7 +226,7 @@
             }
           });
 
-          // REGRA DE SUPRESSÃO: Se a semana não tiver treinos E não for a semana atual do ciclo ativo, ignora e NÃO exibe
+          // REGRA DE SUPRESSÃO: Oculta semanas sem treinos (exceto a semana atual do ciclo ativo)
           if (weekWorkouts.length === 0 && !isCurrentWeek) {
             iterMonday.setDate(iterMonday.getDate() + 7);
             weekIndex++;
@@ -234,7 +234,7 @@
           }
 
           let weekTitle = isCurrentCycle
-            ? (isCurrentWeek ? `Semana Atual: Bloco Ativo (Semana ${weekIndex})` : `Semana ${weekIndex}: Bloco Anterior`)
+            ? (isCurrentWeek ? `Semana ${weekIndex}: Bloco Ativo (Semana Atual)` : `Semana ${weekIndex}: Registro de Treinos`)
             : `Semana ${weekIndex}: Registro de Treinos`;
 
           const statusTag = isCurrentWeek
@@ -268,7 +268,7 @@
 
           const weekUid = `${cycle.id || index}-w${weekIndex}`;
 
-          weeksHtml = `
+          weeksList.unshift(`
             <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
@@ -290,13 +290,13 @@
                 ${workoutsListHtml}
               </div>
             </div>
-          ` + weeksHtml;
+          `);
 
           iterMonday.setDate(iterMonday.getDate() + 7);
           weekIndex++;
         }
 
-        // Se o ciclo não teve nenhuma semana com treino, não exibe o card do ciclo inteiro
+        const weeksHtml = weeksList.join('');
         if (!weeksHtml && !isCurrentCycle) return;
 
         const badgeTag = isCurrentCycle
@@ -306,7 +306,7 @@
         fullCyclesHtml += `
           <div class="cycle-block">
             <div class="cycle-title">
-              <span>🎯 Ciclo: ${cycle.goalName}</span>
+              <span>🎯 Ciclo: ${cycleName}</span>
               ${badgeTag}
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">

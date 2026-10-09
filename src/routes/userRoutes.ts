@@ -4,6 +4,53 @@ import { UserService, UserProfileInput } from '../services/userService';
 
 const router = Router();
 
+// GET: Buscar histórico de ciclos de treino do banco de dados (Prisma)
+router.get('/cycles', async (req, res) => {
+  try {
+    const cycles = await (prisma as any).userCycle.findMany({
+      where: { userId: 'main-user' },
+      orderBy: { startDate: 'desc' },
+    });
+    return res.json(cycles);
+  } catch (error) {
+    console.error('Erro ao buscar ciclos:', error);
+    return res.status(500).json({ error: 'Erro interno ao buscar ciclos.' });
+  }
+});
+
+// POST: Registrar transição/mudança de ciclo e encerrar o anterior
+router.post('/cycles', async (req, res) => {
+  try {
+    const { goalName } = req.body;
+    if (!goalName) {
+      return res.status(400).json({ error: 'O nome do objetivo/ciclo é obrigatório.' });
+    }
+
+    const now = new Date();
+
+    // 1. Encerra qualquer ciclo que esteja ativo no momento (onde endDate é null)
+    await (prisma as any).userCycle.updateMany({
+      where: { userId: 'main-user', endDate: null },
+      data: { endDate: now },
+    });
+
+    // 2. Insere o novo ciclo ativo no banco
+    const newCycle = await (prisma as any).userCycle.create({
+      data: {
+        userId: 'main-user',
+        goalName,
+        startDate: now,
+        endDate: null,
+      },
+    });
+
+    return res.status(201).json(newCycle);
+  } catch (error) {
+    console.error('Erro ao registrar novo ciclo:', error);
+    return res.status(500).json({ error: 'Erro interno ao registrar novo ciclo.' });
+  }
+});
+
 // POST: Salvar ou Atualizar o Perfil Antropométrico (Calculado dinamicamente pelos treinos)
 router.post('/profile', async (req, res) => {
   try {
@@ -16,7 +63,7 @@ router.post('/profile', async (req, res) => {
     // Chama o cálculo dinâmico cruzando com os dados do banco
     const calculatedMetrics = await UserService.calculateMetricsDynamic(data);
 
-   // Salva no banco (armazenando o nível de atividade calculado dinamicamente)
+   // Salva no banco (armazenando o nível de atividade calculated dinamicamente)
     const userProfile = await (prisma as any).userProfile.upsert({
       where: { id: 'main-user' },
       update: {

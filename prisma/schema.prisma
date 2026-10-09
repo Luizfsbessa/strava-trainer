@@ -95,3 +95,12 @@ model UserBadge {
   unlockedAt  DateTime @default(now())
   badge       Badge    @relation(fields: [badgeId], references: [id])
 }
+
+model UserCycle {
+  id        String    @id @default(uuid())
+  userId    String    @default("main-user")
+  goalName  String
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+}
