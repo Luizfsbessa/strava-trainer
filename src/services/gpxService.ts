@@ -23,21 +23,16 @@ export class GpxService {
       const p = validPoints[i];
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-        
         if (lastPoint.time && p.time) {
           const t1 = new Date(lastPoint.time).getTime();
           const t2 = new Date(p.time).getTime();
           const diffSecs = (t2 - t1) / 1000;
 
-          // Se o salto temporal for maior que 20s (ex: pausa manual longa), ignora o gap
-          if (diffSecs > 0 && diffSecs <= 20) {
-            if (dist < 200) { 
-              totalDistanceMeters += dist;
-              movingSeconds += diffSecs;
-            }
+          // Considera movimento continuo se diff <= 15s e dist razoavel
+          if (diffSecs > 0 && diffSecs <= 15 && dist < 200) {
+            totalDistanceMeters += dist;
+            movingSeconds += diffSecs;
           }
-        } else {
-          if (dist < 200) totalDistanceMeters += dist;
         }
       }
       lastPoint = p;
@@ -45,10 +40,10 @@ export class GpxService {
 
     const splits: any[] = [];
 
-    // 1. Tenta extrair laps nativos (<lap>) via Regex
+    // 1. Tenta extrair tags <lap> nativas (se existirem)
     const lapRegex = /<lap\b[^>]*>([\s\S]*?)<\/lap>/gi;
     let lapMatch;
-    let lapIndex = 0; // Começa em 0 para bater exatamente com a tabela do Strava (Volta 0, Volta 1...)
+    let lapIndex = 0;
 
     while ((lapMatch = lapRegex.exec(gpxString)) !== null) {
       const lapContent = lapMatch[1];
@@ -78,66 +73,76 @@ export class GpxService {
       });
     }
 
-    // 2. Se não houver <lap>, extrai os segmentos explícitos do GPX (<trkseg>)
-    // O Strava/Garmin salva cada clique de "Lap" como um <trkseg> novo no GPX!
+    // 2. Se não houver <lap>, agrupa pontos por saltos temporais (Gaps de botão Lap / Pausa)
     if (splits.length === 0) {
-      const trksegMatches = gpxString.match(/<trkseg>([\s\S]*?)<\/trkseg>/gi);
+      const rawSegments: any[][] = [];
+      let currentSeg: any[] = [];
 
-      if (trksegMatches && trksegMatches.length > 1) {
-        trksegMatches.forEach((segXml, segIdx) => {
-          // Extrai os pontos deste segmento específico
-          const trkptRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[\s\S]*?(?:<time>([^<]+)<\/time>)?/gi;
-          let ptMatch;
-          let segDistMeters = 0;
+      for (let i = 0; i < validPoints.length; i++) {
+        const pt = validPoints[i];
+        if (currentSeg.length > 0) {
+          const prevPt = currentSeg[currentSeg.length - 1];
+          if (prevPt.time && pt.time) {
+            const diffSecs = (new Date(pt.time).getTime() - new Date(prevPt.time).getTime()) / 1000;
+            
+            // Se houver um salto de tempo > 2 segundos (típico de acionamento de Lap / Pausa no relógio)
+            if (diffSecs > 2) {
+              rawSegments.push(currentSeg);
+              currentSeg = [];
+            }
+          }
+        }
+        currentSeg.push(pt);
+      }
+      if (currentSeg.length > 0) {
+        rawSegments.push(currentSeg);
+      }
+
+      // Se identificamos mais de um segmento (laps manuais recortados pelas pausas)
+      if (rawSegments.length > 1) {
+        rawSegments.forEach((segPts, idx) => {
+          let segDist = 0;
           let segSecs = 0;
-          let prevPt: any = null;
+          let prev: any = null;
 
-          while ((ptMatch = trkptRegex.exec(segXml)) !== null) {
-            const currentPt = {
-              lat: parseFloat(ptMatch[1]),
-              lon: parseFloat(ptMatch[2]),
-              time: ptMatch[3] ? ptMatch[3] : null
-            };
-
-            if (prevPt) {
-              const d = GpxService.haversineDistance(prevPt.lat, prevPt.lon, currentPt.lat, currentPt.lon);
-              if (prevPt.time && currentPt.time) {
-                const diff = (new Date(currentPt.time).getTime() - new Date(prevPt.time).getTime()) / 1000;
-                if (diff > 0 && diff <= 20 && d < 200) {
-                  segDistMeters += d;
-                  segSecs += diff;
+          segPts.forEach(pt => {
+            if (prev) {
+              const d = GpxService.haversineDistance(prev.lat, prev.lon, pt.lat, pt.lon);
+              if (prev.time && pt.time) {
+                const tDiff = (new Date(pt.time).getTime() - new Date(prev.time).getTime()) / 1000;
+                if (tDiff > 0 && tDiff <= 15 && d < 200) {
+                  segDist += d;
+                  segSecs += tDiff;
                 }
-              } else if (d < 200) {
-                segDistMeters += d;
               }
             }
-            prevPt = currentPt;
-          }
+            prev = pt;
+          });
 
-          const segDistKm = segDistMeters / 1000;
-          if (segDistKm > 0.01) {
-            const lMin = Math.floor(segSecs / 60);
-            const lSec = Math.round(segSecs % 60);
-            let segPace = '00:00';
-            if (segDistKm > 0 && segSecs > 0) {
-              const secPerKm = segSecs / segDistKm;
-              const pMin = Math.floor(secPerKm / 60);
-              const pSec = Math.round(secPerKm % 60);
-              segPace = `${pMin}:${pSec < 10 ? '0' : ''}${pSec} /km`;
+          const distKm = segDist / 1000;
+          if (distKm > 0.02) { // ignora fragmentos minúsculos
+            const m = Math.floor(segSecs / 60);
+            const s = Math.round(segSecs % 60);
+            let paceStr = '00:00';
+            if (distKm > 0 && segSecs > 0) {
+              const spk = segSecs / distKm;
+              const pm = Math.floor(spk / 60);
+              const ps = Math.round(spk % 60);
+              paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps} /km`;
             }
 
             splits.push({
-              lap_index: segIdx, // 0, 1, 2, ...
-              distance_km: Number(segDistKm.toFixed(2)),
-              moving_time_formatted: `${lMin < 10 ? '0' : ''}${lMin}:${lSec < 10 ? '0' : ''}${lSec}`,
-              pace: segPace
+              lap_index: idx,
+              distance_km: Number(distKm.toFixed(2)),
+              moving_time_formatted: `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`,
+              pace: paceStr
             });
           }
         });
       }
     }
 
-    // 3. Fallback de emergência (se o GPX for um bloco único sem <lap> nem <trkseg>)
+    // 3. Fallback Padrão por KM (apenas se for um treino contínuo sem nenhuma pausa/lap)
     if (splits.length === 0) {
       let currentSplitDist = 0;
       let currentSplitSecs = 0;
@@ -150,7 +155,7 @@ export class GpxService {
           const dist = GpxService.haversineDistance(prevPoint.lat, prevPoint.lon, p.lat, p.lon);
           const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
 
-          if (diffSecs > 0 && diffSecs <= 20 && dist < 200) {
+          if (diffSecs > 0 && diffSecs <= 15 && dist < 200) {
             currentSplitDist += dist;
             currentSplitSecs += diffSecs;
 
