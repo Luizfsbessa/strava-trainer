@@ -23,13 +23,19 @@ export class GpxService {
       const p = validPoints[i];
       if (lastPoint) {
         const dist = GpxService.haversineDistance(lastPoint.lat, lastPoint.lon, p.lat, p.lon);
-        if (dist > 0.5 && dist < 30) {
-          totalDistanceMeters += dist;
-          if (lastPoint.time && p.time) {
-            const t1 = new Date(lastPoint.time).getTime();
-            const t2 = new Date(p.time).getTime();
-            const diffSecs = (t2 - t1) / 1000;
-            if (diffSecs > 0 && diffSecs < 60) {
+        
+        if (lastPoint.time && p.time) {
+          const t1 = new Date(lastPoint.time).getTime();
+          const t2 = new Date(p.time).getTime();
+          const diffSecs = (t2 - t1) / 1000;
+
+          // AJUSTE: Considera pausa se a diferença de tempo for > 5s ou se a velocidade for irreal/muito baixa
+          if (diffSecs > 0 && diffSecs <= 5) {
+            const speed = dist / diffSecs; // m/s
+            
+            // Só acumula se a velocidade for humana para corrida (> 0.5 m/s e < 8.3 m/s)
+            if (speed >= 0.5 && speed <= 8.33) {
+              totalDistanceMeters += dist;
               movingSeconds += diffSecs;
             }
           }
@@ -82,13 +88,15 @@ export class GpxService {
         let segPrev: any = null;
 
         segPoints.forEach(p => {
-          if (segPrev) {
+          if (segPrev && segPrev.time && p.time) {
             const dist = GpxService.haversineDistance(segPrev.lat, segPrev.lon, p.lat, p.lon);
-            if (dist > 0.5 && dist < 30) {
-              segDistMeters += dist;
-              if (segPrev.time && p.time) {
-                const diff = (new Date(p.time).getTime() - new Date(segPrev.time).getTime()) / 1000;
-                if (diff > 0 && diff < 60) segSecs += diff;
+            const diff = (new Date(p.time).getTime() - new Date(segPrev.time).getTime()) / 1000;
+            
+            if (diff > 0 && diff <= 5) {
+              const speed = dist / diff;
+              if (speed >= 0.5 && speed <= 8.33) {
+                segDistMeters += dist;
+                segSecs += diff;
               }
             }
           }
@@ -117,7 +125,7 @@ export class GpxService {
       });
     }
 
-    // 3. Deteta tiros/intervalos analisando pausas ou recuperações (> 15 segundos entre pontos)
+    // 3. Deteta tiros/intervalos analisando pausas ou recuperações (> 10 segundos entre pontos)
     if (splits.length === 0) {
       let intervalSegments: any[] = [];
       let currentSegPoints: any[] = [];
@@ -128,7 +136,7 @@ export class GpxService {
 
         if (i > 0 && validPoints[i - 1].time && p.time) {
           const diffSecs = (new Date(p.time).getTime() - new Date(validPoints[i - 1].time).getTime()) / 1000;
-          if (diffSecs > 15 && currentSegPoints.length > 10) {
+          if (diffSecs > 10 && currentSegPoints.length > 5) {
             intervalSegments.push([...currentSegPoints]);
             currentSegPoints = [p];
           }
@@ -144,13 +152,15 @@ export class GpxService {
           let segSecs = 0;
           let prev: any = null;
           segPts.forEach(pt => {
-            if (prev) {
+            if (prev && prev.time && pt.time) {
               const d = GpxService.haversineDistance(prev.lat, prev.lon, pt.lat, pt.lon);
-              if (d > 0.5 && d < 30) {
-                segDist += d;
-                if (prev.time && pt.time) {
-                  const tDiff = (new Date(pt.time).getTime() - new Date(prev.time).getTime()) / 1000;
-                  if (tDiff > 0 && tDiff < 60) segSecs += tDiff;
+              const tDiff = (new Date(pt.time).getTime() - new Date(prev.time).getTime()) / 1000;
+              
+              if (tDiff > 0 && tDiff <= 5) {
+                const spd = d / tDiff;
+                if (spd >= 0.5 && spd <= 8.33) {
+                  segDist += d;
+                  segSecs += tDiff;
                 }
               }
             }
@@ -189,28 +199,28 @@ export class GpxService {
 
       for (let i = 0; i < validPoints.length; i++) {
         const p = validPoints[i];
-        if (prevPoint) {
+        if (prevPoint && prevPoint.time && p.time) {
           const dist = GpxService.haversineDistance(prevPoint.lat, prevPoint.lon, p.lat, p.lon);
-          if (dist > 0.5 && dist < 30) {
-            currentSplitDist += dist;
-            if (prevPoint.time && p.time) {
-              const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
-              if (diffSecs > 0 && diffSecs < 60) {
-                currentSplitSecs += diffSecs;
-              }
-            }
+          const diffSecs = (new Date(p.time).getTime() - new Date(prevPoint.time).getTime()) / 1000;
 
-            while (currentSplitDist >= 1000) {
-              const lapMin = Math.floor(currentSplitSecs / 60);
-              const lapSec = Math.round(currentSplitSecs % 60);
-              splits.push({
-                lap_index: splitIndex++,
-                distance_km: 1.0,
-                moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
-                pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
-              });
-              currentSplitDist -= 1000;
-              currentSplitSecs = 0;
+          if (diffSecs > 0 && diffSecs <= 5) {
+            const speed = dist / diffSecs;
+            if (speed >= 0.5 && speed <= 8.33) {
+              currentSplitDist += dist;
+              currentSplitSecs += diffSecs;
+
+              while (currentSplitDist >= 1000) {
+                const lapMin = Math.floor(currentSplitSecs / 60);
+                const lapSec = Math.round(currentSplitSecs % 60);
+                splits.push({
+                  lap_index: splitIndex++,
+                  distance_km: 1.0,
+                  moving_time_formatted: `${lapMin < 10 ? '0' : ''}${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec}`,
+                  pace: `${lapMin}:${lapSec < 10 ? '0' : ''}${lapSec} /km`
+                });
+                currentSplitDist -= 1000;
+                currentSplitSecs = 0;
+              }
             }
           }
         }
