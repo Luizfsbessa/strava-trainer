@@ -292,15 +292,15 @@
       if (res.ok) {
         const apiData = await res.json();
         if (apiData.profile) {
-          // 1. Preenche Peso Atual
+          // 1. Peso Atual
           document.getElementById('pWeight').value = apiData.profile.weightKg || 99.3;
-          
-          // 2. Preenche Peso Meta / Alvo (se existir no banco)
+
+          // 2. Peso Meta (com W maiúsculo)
           if (apiData.profile.targetWeight) {
             document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
           }
 
-          // 3. Preenche Data de Nascimento / Idade correta
+          // 3. Data de Nascimento
           if (apiData.profile.birthDate) {
             document.getElementById('pBirthDate').value = apiData.profile.birthDate.split('T')[0];
           } else if (apiData.profile.age) {
@@ -309,7 +309,7 @@
             document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
           }
 
-          // 4. Seleciona o Objetivo correto no <select> com base no que veio do banco
+          // 4. Seleciona o Objetivo ativo vindo do banco
           if (apiData.profile.activeGoalName) {
             const objectiveSelect = document.getElementById('pObjective');
             for (let i = 0; i < objectiveSelect.options.length; i++) {

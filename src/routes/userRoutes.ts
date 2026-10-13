@@ -71,7 +71,7 @@ router.post('/profile', async (req, res) => {
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
         weightKg: Number(data.weightKg),
-        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null, // Salva o Peso Meta
         heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
@@ -83,7 +83,7 @@ router.post('/profile', async (req, res) => {
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
         weightKg: Number(data.weightKg),
-        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null, // Salva o Peso Meta
         heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
@@ -116,6 +116,7 @@ router.post('/profile', async (req, res) => {
 });
 
 // GET: Retornar o perfil completo com peso meta e data de nascimento
+// GET: Retornar o perfil e métricas
 router.get('/profile', async (req, res) => {
   try {
     const userProfile = await (prisma as any).userProfile.findUnique({
@@ -134,7 +135,7 @@ router.get('/profile', async (req, res) => {
       goal: userProfile.goal as any,
     });
 
-    // Busca também o ciclo ativo atual para preencher o objetivo corretamente
+    // Busca o ciclo de treino ativo para mapear o objetivo no select
     const activeCycle = await (prisma as any).userCycle.findFirst({
       where: { userId: 'main-user', endDate: null },
       orderBy: { startDate: 'desc' }
