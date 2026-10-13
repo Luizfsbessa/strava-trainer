@@ -318,11 +318,10 @@
           console.warn('Erro ao buscar ciclo ativo do banco:', e);
         }
 
-        const storedWeight = localStorage.getItem('user_current_weight');
-        const currentWeightNum = parseFloat(String(storedWeight || rawProfile.currentWeight || rawProfile.weight || 99.7).replace(',', '.'));
-        const targetWeightNum = parseFloat(String(rawProfile.targetWeight || rawProfile.targetweight || 90.0).replace(',', '.'));
+        const currentWeightNum = parseFloat(String(rawProfile.weightKg || 99.3).replace(',', '.'));
+        const targetWeightNum = parseFloat(String(rawProfile.targetWeight || 90.0).replace(',', '.'));
 
-        const savedObjective = (activeCycle && activeCycle.goalName) ? activeCycle.goalName : (localStorage.getItem('user_objective') || rawProfile.objective || "5km");
+        const savedObjective = (activeCycle && activeCycle.goalName) ? activeCycle.goalName : (rawProfile.goal || "5km");
 
         const profile = {
           age: rawProfile.age || 39,
