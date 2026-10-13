@@ -334,44 +334,51 @@
   }
 
     async function saveProfile(event) {
-      event.preventDefault();
-      const birthDateVal = document.getElementById('pBirthDate').value;
-      const weightVal = parseFloat(document.getElementById('pWeight').value);
-      const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
-      const objectiveSelect = document.getElementById('pObjective');
-      const objectiveVal = objectiveSelect.value;
-      const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
-      const ageVal = calculateAge(birthDateVal);
+    event.preventDefault();
+    const birthDateVal = document.getElementById('pBirthDate').value;
+    const weightVal = parseFloat(document.getElementById('pWeight').value);
+    const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
+    const objectiveSelect = document.getElementById('pObjective');
+    const objectiveVal = objectiveSelect.value;
+    const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
+    const ageVal = calculateAge(birthDateVal);
 
-      try {
-        // 1. Atualiza Perfil Antropométrico do Usuário
-        await fetch('/api/user/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            age: ageVal,
-            gender: 'MALE',
-            weightKg: weightVal,
-            heightCm: 180,
-            goal: objectiveVal === 'perda_peso' ? 'WEIGHT_LOSS' : 'MAINTENANCE'
-          })
-        });
+    try {
+      // 1. Envia os dados completos para o perfil (incluindo o peso meta e a data/idade correta)
+      const profileRes = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          age: ageVal,
+          birthDate: birthDateVal, // Enviando a data exata para persistir no banco
+          weightKg: weightVal,
+          targetWeight: isNaN(targetWeightVal) ? null : targetWeightVal, // Envia o peso meta corretamente
+          goal: objectiveVal
+        })
+      });
 
-        // 2. Transição do Ciclo diretamente no Banco Neon/PostgreSQL via Prisma
-        await fetch('/api/user/cycles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goalName: objectiveText })
-        });
+      if (!profileRes.ok) throw new Error('Erro ao salvar perfil no servidor.');
 
-        alert('Perfil e Ciclo salvos no Banco de Dados com sucesso!');
-      } catch (e) {
-        console.error('Erro ao salvar dados:', e);
-        alert('Erro ao salvar no banco de dados.');
-      }
+      // 2. Salva o objetivo/ciclo de treinamento
+      const cycleRes = await fetch('/api/user/cycles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          goalKey: objectiveVal,
+          goalName: objectiveText 
+        })
+      });
 
-      await loadWeightChart();
+      if (!cycleRes.ok) throw new Error('Erro ao salvar ciclo de treino.');
+
+      alert('Perfil, peso meta e objetivos salvos no Banco de Dados com sucesso!');
+    } catch (e) {
+      console.error('Erro ao salvar dados:', e);
+      alert('Erro ao salvar no banco de dados. Verifique a conexão.');
     }
+
+    await loadWeightChart();
+  }
 
     document.addEventListener('DOMContentLoaded', loadProfile);
   </script>
