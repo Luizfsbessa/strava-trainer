@@ -21,20 +21,22 @@ model Workout {
 }
 
 model UserProfile {
-  id                 String   @id @default("main-user")
+  id                 String    @id @default("main-user")
   age                Int
+  birthDate          DateTime? // Adicionado para guardar a data exata de nascimento
   gender             String
   weightKg           Float
+  targetWeight       Float?    // Adicionado para guardar o Peso Meta / Alvo
   heightCm           Float
   activityLevel      String
   goal               String
   dailyCalorieTarget Int
   // Novas zonas personalizadas de Pace (em min/km)
-  targetPaceZ2Min    String   @default("7:00")
-  targetPaceZ2Max    String   @default("7:35")
-  targetPaceZ4Min    String   @default("5:45")
-  targetPaceZ4Max    String   @default("6:30")
-  updatedAt          DateTime @updatedAt
+  targetPaceZ2Min    String    @default("7:00")
+  targetPaceZ2Max    String    @default("7:35")
+  targetPaceZ4Min    String    @default("5:45")
+  targetPaceZ4Max    String    @default("6:30")
+  updatedAt          DateTime  @updatedAt
 }
 
 model TrainingPlan {
