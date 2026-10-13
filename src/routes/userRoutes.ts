@@ -52,35 +52,39 @@ router.post('/cycles', async (req, res) => {
 });
 
 // POST: Salvar ou Atualizar o Perfil Antropométrico (Calculado dinamicamente pelos treinos)
+// POST: Salvar ou Atualizar o Perfil Antropométrico
 router.post('/profile', async (req, res) => {
   try {
-    const data: UserProfileInput = req.body;
+    const data = req.body;
     
     if (!data.age || !data.weightKg || !data.heightCm || !data.gender) {
       return res.status(400).json({ error: 'Preencha idade, peso, altura e gênero obrigatórios.' });
     }
 
-    // Chama o cálculo dinâmico cruzando com os dados do banco
     const calculatedMetrics = await UserService.calculateMetricsDynamic(data);
 
-   // Salva no banco (armazenando o nível de atividade calculated dinamicamente)
+    // Salva no banco incluindo o peso meta e a data de nascimento (se suportado pelo Prisma schema)
     const userProfile = await (prisma as any).userProfile.upsert({
       where: { id: 'main-user' },
       update: {
-        age: data.age,
+        age: Number(data.age),
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
-        weightKg: data.weightKg,
-        heightCm: data.heightCm,
+        weightKg: Number(data.weightKg),
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
+        heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
         dailyCalorieTarget: calculatedMetrics.recommendedCalories,
       },
       create: {
         id: 'main-user',
-        age: data.age,
+        age: Number(data.age),
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
-        weightKg: data.weightKg,
-        heightCm: data.heightCm,
+        weightKg: Number(data.weightKg),
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
+        heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
         dailyCalorieTarget: calculatedMetrics.recommendedCalories,
@@ -101,13 +105,50 @@ router.post('/profile', async (req, res) => {
     }
 
     return res.status(200).json({
-      message: 'Perfil atualizado e calorias calibradas com base nos seus treinos reais!',
+      message: 'Perfil atualizado com sucesso!',
       profile: userProfile,
       metrics: calculatedMetrics,
     });
   } catch (error: any) {
     console.error('Erro ao salvar perfil:', error);
     return res.status(500).json({ error: 'Erro interno ao processar dados de perfil.' });
+  }
+});
+
+// GET: Retornar o perfil completo com peso meta e data de nascimento
+router.get('/profile', async (req, res) => {
+  try {
+    const userProfile = await (prisma as any).userProfile.findUnique({
+      where: { id: 'main-user' },
+    });
+
+    if (!userProfile) {
+      return res.status(404).json({ error: 'Perfil não configurado ainda.' });
+    }
+
+    const calculatedMetrics = await UserService.calculateMetricsDynamic({
+      age: userProfile.age,
+      gender: userProfile.gender as any,
+      weightKg: userProfile.weightKg,
+      heightCm: userProfile.heightCm,
+      goal: userProfile.goal as any,
+    });
+
+    // Busca também o ciclo ativo atual para preencher o objetivo corretamente
+    const activeCycle = await (prisma as any).userCycle.findFirst({
+      where: { userId: 'main-user', endDate: null },
+      orderBy: { startDate: 'desc' }
+    });
+
+    return res.json({
+      profile: {
+        ...userProfile,
+        activeGoalName: activeCycle ? activeCycle.goalName : null
+      },
+      metrics: calculatedMetrics,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Erro ao buscar perfil.' });
   }
 });
 
