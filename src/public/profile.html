@@ -285,32 +285,53 @@
     }
 
     async function loadProfile() {
-      let basePaceSec = 442;
+    let basePaceSec = 442;
 
-      try {
-        const res = await fetch('/api/user/profile');
-        if (res.ok) {
-          const apiData = await res.json();
-          if (apiData.profile) {
-            document.getElementById('pWeight').value = apiData.profile.weightKg || 103;
-            if (apiData.profile.targetWeight) {
-              document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
-            }
-            if (apiData.profile.age) {
-              const currentYear = new Date().getFullYear();
-              const estimatedYear = currentYear - apiData.profile.age;
-              document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
-            }
-            const currentAge = calculateAge(document.getElementById('pBirthDate').value);
-            updateZonesTable(currentAge, basePaceSec);
+    try {
+      const res = await fetch('/api/user/profile');
+      if (res.ok) {
+        const apiData = await res.json();
+        if (apiData.profile) {
+          // 1. Preenche Peso Atual
+          document.getElementById('pWeight').value = apiData.profile.weightKg || 99.3;
+          
+          // 2. Preenche Peso Meta / Alvo (se existir no banco)
+          if (apiData.profile.targetWeight) {
+            document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
           }
-        }
-      } catch (e) {
-        console.log('Sem conexão com API local.');
-      }
 
-      await loadWeightChart();
+          // 3. Preenche Data de Nascimento / Idade correta
+          if (apiData.profile.birthDate) {
+            // Se o banco já salvar a data exata de nascimento
+            document.getElementById('pBirthDate').value = apiData.profile.birthDate.split('T')[0];
+          } else if (apiData.profile.age) {
+            const currentYear = new Date().getFullYear();
+            const estimatedYear = currentYear - apiData.profile.age;
+            document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
+          }
+
+          // 4. Seleciona o Objetivo correto no <select> com base no que veio do banco
+          if (apiData.profile.goal) {
+            const objectiveSelect = document.getElementById('pObjective');
+            for (let i = 0; i < objectiveSelect.options.length; i++) {
+              if (objectiveSelect.options[i].value === apiData.profile.goal || 
+                  objectiveSelect.options[i].text === apiData.profile.goalName) {
+                objectiveSelect.selectedIndex = i;
+                break;
+              }
+            }
+          }
+
+          const currentAge = calculateAge(document.getElementById('pBirthDate').value);
+          updateZonesTable(currentAge, basePaceSec);
+        }
+      }
+    } catch (e) {
+      console.log('Sem conexão com API local ou erro ao carregar perfil:', e);
     }
+
+    await loadWeightChart();
+  }
 
     async function saveProfile(event) {
       event.preventDefault();
