@@ -512,13 +512,28 @@
     }
 
     function getPaceRangeForZone(baseSecs, zone) {
-      if (zone && (zone.includes('Z2') || zone.includes('QUEIMA DE GORDURA'))) return '7:00 - 7:35 /km';
-      if (zone && (zone.includes('Z4') || zone.includes('Z3') || zone.includes('MODERADO'))) return '5:45 - 6:30 /km';
+      const zoneUpper = String(zone || "").toUpperCase();
+
+      if (zoneUpper.includes('Z5') || zoneUpper.includes('ESFORÇO MÁXIMO')) {
+        return '4:45 - 5:30 /km';
+      }
+      if (zoneUpper.includes('Z4') || zoneUpper.includes('LIMIAR')) {
+        return '5:20 - 5:55 /km';
+      }
+      if (zoneUpper.includes('Z3') || zoneUpper.includes('MODERADO')) {
+        return '6:00 - 6:40 /km';
+      }
+      if (zoneUpper.includes('Z2') || zoneUpper.includes('QUEIMA DE GORDURA')) {
+        return '6:50 - 7:35 /km';
+      }
+      if (zoneUpper.includes('Z1') || zoneUpper.includes('REGENERATIVO') || zoneUpper.includes('MUITO LEVE')) {
+        return '7:40 - 8:30 /km';
+      }
 
       let minMultiplier = 1.0, maxMultiplier = 1.0;
-      if (zone === 'Z1') { minMultiplier = 1.15; maxMultiplier = 1.30; }
-      else if (zone === 'Z5') { minMultiplier = 0.75; maxMultiplier = 0.84; }
-      else { return 'Livre'; }
+      if (zoneUpper === 'Z1') { minMultiplier = 1.15; maxMultiplier = 1.30; }
+      else if (zoneUpper === 'Z5') { minMultiplier = 0.70; maxMultiplier = 0.80; }
+      else { minMultiplier = 0.90; maxMultiplier = 1.05; }
 
       return `${formatPace(baseSecs * minMultiplier)} - ${formatPace(baseSecs * maxMultiplier)} /km`;
     }
