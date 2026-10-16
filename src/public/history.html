@@ -368,7 +368,7 @@
         }
       });
 
-      // Metas de distâncias para PRs (em quilómetros)
+      // Metas de distâncias oficiais para PRs (em quilómetros)
       let prsTargets = {
         '1km': { target: 1.0, bestId: null, bestTime: Infinity, label: '🏆 PR 1 km' },
         '5k': { target: 5.0, bestId: null, bestTime: Infinity, label: '🏆 PR 5K' },
@@ -381,12 +381,11 @@
       let maxDistId = null;
 
       workouts.forEach(w => {
-        // Assegura compatibilidade com todas as variações de nomes de campos do banco/JSON
         const distKm = parseFloat(w.distanceKm || w.distance || w.distancia || 0);
         const id = w.id;
         if (!id) return;
 
-        // 1. Registo de Maior Distância
+        // 1. Registo de Maior Distância absoluta
         if (distKm > maxDist && distKm > 1) {
           maxDist = distKm;
           maxDistId = id;
@@ -400,10 +399,10 @@
         if (distKm > 0 && durationSec > 0) {
           Object.keys(prsTargets).forEach(key => {
             const item = prsTargets[key];
-            // Se o treino cobriu a distância alvo (com tolerância de 80% para abranger variações de percurso)
-            if (distKm >= item.target * 0.8) {
+            // Rigoroso: O treino precisa ter atingido a distância alvo (ex: 5.0 km para o 5K)
+            if (distKm >= item.target) {
               let effectiveTime = durationSec;
-              // Normaliza o tempo proporcionalmente se o treino foi mais longo que a distância alvo
+              // Se o treino foi mais longo (ex: um longão de 10km), calcula o tempo proporcional para o 5K
               if (distKm > item.target * 1.05) {
                 effectiveTime = (durationSec / distKm) * item.target;
               }
@@ -421,11 +420,10 @@
         prRecords.recordsMap[maxDistId].push(`🏆 Maior Distância (${maxDist.toFixed(1)}km)`);
       }
 
-      // Atribui as badges de PRs de tempo/distância
+      // Atribui as badges de PRs reais baseados nas distâncias cumpridas
       Object.keys(prsTargets).forEach(key => {
         const item = prsTargets[key];
         if (item.bestId && prRecords.recordsMap[item.bestId]) {
-          // Evita duplicar se o mesmo treino já tiver recebido a badge de maior distância
           if (!prRecords.recordsMap[item.bestId].includes(item.label)) {
             prRecords.recordsMap[item.bestId].push(item.label);
           }
