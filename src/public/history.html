@@ -359,23 +359,78 @@
     }
 
     function calculatePersonalRecords(workouts) {
-      prRecords = { maxDistId: null, bestPaceId: null, recordsMap: {} };
-      let maxDist = -1;
-
+      prRecords = { recordsMap: {} };
+      
       workouts.forEach(w => {
-        const dist = Number(w.distanceKm || w.distance || 0);
         const id = w.id;
-        if (!prRecords.recordsMap[id]) prRecords.recordsMap[id] = [];
-
-        if (dist > maxDist && dist > 1) {
-          maxDist = dist;
-          prRecords.maxDistId = id;
+        if (id && !prRecords.recordsMap[id]) {
+          prRecords.recordsMap[id] = [];
         }
       });
 
-      if (prRecords.maxDistId) {
-        prRecords.recordsMap[prRecords.maxDistId].push(`🏆 Maior Distância (${maxDist}km)`);
+      // Metas de distâncias para PRs (em quilómetros)
+      let prsTargets = {
+        '1km': { target: 1.0, bestId: null, bestTime: Infinity, label: '🏆 PR 1 km' },
+        '5k': { target: 5.0, bestId: null, bestTime: Infinity, label: '🏆 PR 5K' },
+        '10k': { target: 10.0, bestId: null, bestTime: Infinity, label: '🏆 PR 10K' },
+        '21k': { target: 21.097, bestId: null, bestTime: Infinity, label: '🏆 PR Meia Maratona' },
+        '42k': { target: 42.195, bestId: null, bestTime: Infinity, label: '🏆 PR Maratona' }
+      };
+
+      let maxDist = -1;
+      let maxDistId = null;
+
+      workouts.forEach(w => {
+        // Assegura compatibilidade com todas as variações de nomes de campos do banco/JSON
+        const distKm = parseFloat(w.distanceKm || w.distance || w.distancia || 0);
+        const id = w.id;
+        if (!id) return;
+
+        // 1. Registo de Maior Distância
+        if (distKm > maxDist && distKm > 1) {
+          maxDist = distKm;
+          maxDistId = id;
+        }
+
+        let durationSec = 0;
+        const durMins = parseFloat(w.durationMinutes || w.duracaoMinutos || 0);
+        if (durMins > 0) durationSec = durMins * 60;
+        else durationSec = parseFloat(w.moving_time_sec || w.durationSeconds || w.duration || w.timeSeconds || w.tempo || 0);
+
+        if (distKm > 0 && durationSec > 0) {
+          Object.keys(prsTargets).forEach(key => {
+            const item = prsTargets[key];
+            // Se o treino cobriu a distância alvo (com tolerância de 80% para abranger variações de percurso)
+            if (distKm >= item.target * 0.8) {
+              let effectiveTime = durationSec;
+              // Normaliza o tempo proporcionalmente se o treino foi mais longo que a distância alvo
+              if (distKm > item.target * 1.05) {
+                effectiveTime = (durationSec / distKm) * item.target;
+              }
+              if (effectiveTime < item.bestTime) {
+                item.bestTime = Math.round(effectiveTime);
+                item.bestId = id;
+              }
+            }
+          });
+        }
+      });
+
+      // Atribui a badge de Maior Distância
+      if (maxDistId && prRecords.recordsMap[maxDistId]) {
+        prRecords.recordsMap[maxDistId].push(`🏆 Maior Distância (${maxDist.toFixed(1)}km)`);
       }
+
+      // Atribui as badges de PRs de tempo/distância
+      Object.keys(prsTargets).forEach(key => {
+        const item = prsTargets[key];
+        if (item.bestId && prRecords.recordsMap[item.bestId]) {
+          // Evita duplicar se o mesmo treino já tiver recebido a badge de maior distância
+          if (!prRecords.recordsMap[item.bestId].includes(item.label)) {
+            prRecords.recordsMap[item.bestId].push(item.label);
+          }
+        }
+      });
     }
 
     function changeMonth(direction) {
