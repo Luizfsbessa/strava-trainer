@@ -386,8 +386,8 @@
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
         const PROGRESSION_RATE = 1.05;
 
-        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA BASE FIXA ---
-        let cycleStartDate = new Date('2026-09-28T00:00:00'); 
+        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA BASE DE 04/10 ---
+        let cycleStartDate = new Date('2026-10-04T00:00:00'); 
         cycleStartDate.setHours(0, 0, 0, 0);
 
         const diffInDays = Math.max(0, Math.floor((now - cycleStartDate) / (1000 * 60 * 60 * 24)));
