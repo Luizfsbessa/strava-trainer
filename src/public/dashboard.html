@@ -386,32 +386,28 @@
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
         const PROGRESSION_RATE = 1.05;
 
-        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DO BANCO ---
+        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA DATA DE INÍCIO FIXA DO BANCO ---
         let cycleStartDate;
         if (activeCycle && activeCycle.startDate) {
           cycleStartDate = new Date(activeCycle.startDate);
         } else {
-          cycleStartDate = new Date('2026-10-05T00:00:00');
+          cycleStartDate = new Date('2026-09-28T00:00:00'); // Data base estável mantida
         }
 
         cycleStartDate.setHours(0, 0, 0, 0);
-        const startDay = cycleStartDate.getDay();
-        const diffStartToMonday = startDay === 0 ? -6 : 1 - startDay;
-        const cycleBaseMonday = new Date(cycleStartDate);
-        cycleBaseMonday.setDate(cycleStartDate.getDate() + diffStartToMonday);
-
-        const diffInDays = Math.max(0, Math.floor((now - cycleBaseMonday) / (1000 * 60 * 60 * 24)));
-        const weekIndex = Math.floor(diffInDays / 7);
-
-        const cycleWeekNumber = (weekIndex % 4) + 1;
+        
+        // Diferença exata em dias corridos desde o início do ciclo até o momento atual
+        const diffInDays = Math.max(0, Math.floor((now - cycleStartDate) / (1000 * 60 * 60 * 24)));
+        
+        // Número real da semana em andamento (ex: Dia 0 a 6 = Semana 1, Dia 7 a 13 = Semana 2, Dia 14 a 20 = Semana 3)
+        const absoluteWeekNumber = Math.floor(diffInDays / 7) + 1;
 
         let cycleWeekName = '';
-        switch (cycleWeekNumber) {
-          case 1: cycleWeekName = 'Semana 1: Adaptação Inicial e Base'; break;
-          case 2: cycleWeekName = 'Semana 2: Ritmo e Densidade'; break;
-          case 3: cycleWeekName = 'Semana 3: Pico de Carga'; break;
-          case 4: cycleWeekName = 'Semana 4: Deload / Regenerativa'; break;
-        }
+        if (absoluteWeekNumber === 1) cycleWeekName = 'Semana 1: Adaptação Inicial e Base';
+        else if (absoluteWeekNumber === 2) cycleWeekName = 'Semana 2: Ritmo e Densidade';
+        else if (absoluteWeekNumber === 3) cycleWeekName = 'Semana 3: Pico de Carga';
+        else if (absoluteWeekNumber === 4) cycleWeekName = 'Semana 4: Deload / Regenerativa';
+        else cycleWeekName = `Semana ${absoluteWeekNumber}: Bloco Avançado`;
 
         const dynamicTargetKm = baseVolForProgression * PROGRESSION_RATE * objectiveConfig.volumeMultiplier;
         const basePaceSecs = calculateBasePace(workouts);
@@ -551,13 +547,11 @@
             const easyK = parseFloat((target * 0.35).toFixed(1));
             const longK = parseFloat((target * 0.40).toFixed(1));
 
-            // Ajuste estrito do PASSO A PASSO da Terça-feira (Soma = intK)
             const warmupTiros = 1.5;
             const cooldownTiros = 1.0;
             const mainBlockTirosDist = Math.max(1.0, intK - (warmupTiros + cooldownTiros));
             const numRepsTiros = Math.max(3, Math.round(mainBlockTirosDist / 0.8));
 
-            // Ajuste estrito do PASSO A PASSO da Quinta-feira (Soma = easyK)
             const warmupRitmo = 1.0;
             const cooldownRitmo = 1.0;
             const mainBlockRitmoDist = Math.max(1.0, easyK - (warmupRitmo + cooldownRitmo));

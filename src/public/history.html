@@ -202,19 +202,35 @@
       const activeCycle = cycleHistory[0];
       const cycleName = activeCycle.goalName || activeCycle.title || "Ciclo de Treinamento";
       
-      // Ajusta a data inicial para abranger as semanas anteriores onde os treinos foram realizados (ex: final de setembro/início de outubro)
-      const cycleStartDate = new Date('2026-09-28T00:00:00'); 
+      // Data de início fixa e estável obtida do ciclo ativo (ou fallback seguro para 28/09/2026)
+      const cycleStartDate = activeCycle.startDate ? new Date(activeCycle.startDate) : new Date('2026-09-28T00:00:00'); 
+      cycleStartDate.setHours(0, 0, 0, 0);
+
+      // Alinha a segunda-feira da semana base inicial
+      const startDay = cycleStartDate.getDay();
+      const diffStartToMonday = startDay === 0 ? -6 : 1 - startDay;
+      const cycleBaseMonday = new Date(cycleStartDate);
+      cycleBaseMonday.setDate(cycleStartDate.getDate() + diffStartToMonday);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Calcula o número total de semanas decorridas desde o início fixo do ciclo
+      const diffInDays = Math.max(0, Math.floor((today - cycleBaseMonday) / (1000 * 60 * 60 * 24)));
+      const currentAbsoluteWeekNumber = Math.floor(diffInDays / 7) + 1;
 
       let weeksList = [];
-      let iterMonday = new Date(cycleStartDate);
-      let weekIndex = 1;
-      const today = new Date();
+      // Renderiza as últimas 5 semanas dinamicamente em ordem decrescente (mais recente no topo)
+      let targetWeekToShow = Math.max(1, currentAbsoluteWeekNumber + 1);
 
-      // Gera as semanas do ciclo dinamicamente com base nas datas reais
-      while (weekIndex <= 4) {
-        const iterSunday = new Date(iterMonday.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
-        
-        // Identifica qual é a semana atual com base na data do dia (13/10/2026 cai na Semana 3 ou 2 dependendo do corte)
+      while (targetWeekToShow >= Math.max(1, currentAbsoluteWeekNumber - 3)) {
+        const iterMonday = new Date(cycleBaseMonday);
+        iterMonday.setDate(cycleBaseMonday.getDate() + (targetWeekToShow - 1) * 7);
+
+        const iterSunday = new Date(iterMonday);
+        iterSunday.setDate(iterMonday.getDate() + 6);
+        iterSunday.setHours(23, 59, 59, 999);
+
         const isCurrentWeek = today >= iterMonday && today <= iterSunday;
 
         let kmDone = 0;
@@ -235,8 +251,8 @@
         });
 
         let weekTitle = isCurrentWeek 
-          ? `Semana ${weekIndex}: Bloco Ativo (Semana Atual)` 
-          : `Semana ${weekIndex}: Registro de Treinos`;
+          ? `Semana ${targetWeekToShow}: Bloco Ativo (Semana Atual)` 
+          : `Semana ${targetWeekToShow}: Registro de Treinos`;
 
         const statusTag = isCurrentWeek
           ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
@@ -267,7 +283,7 @@
           workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
         }
 
-        const weekUid = `active-w${weekIndex}`;
+        const weekUid = `active-w${targetWeekToShow}`;
 
         const weekHtmlBlock = `
           <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
@@ -293,15 +309,8 @@
           </div>
         `;
 
-        // Coloca a semana atual ou mais recente no topo da pilha
-        if (isCurrentWeek) {
-          weeksList.unshift(weekHtmlBlock);
-        } else {
-          weeksList.push(weekHtmlBlock);
-        }
-
-        iterMonday.setDate(iterMonday.getDate() + 7);
-        weekIndex++;
+        weeksList.push(weekHtmlBlock);
+        targetWeekToShow--;
       }
 
       fullCyclesHtml = `

@@ -51,7 +51,6 @@ router.post('/cycles', async (req, res) => {
   }
 });
 
-// POST: Salvar ou Atualizar o Perfil Antropométrico (Calculado dinamicamente pelos treinos)
 // POST: Salvar ou Atualizar o Perfil Antropométrico
 router.post('/profile', async (req, res) => {
   try {
@@ -63,7 +62,12 @@ router.post('/profile', async (req, res) => {
 
     const calculatedMetrics = await UserService.calculateMetricsDynamic(data);
 
-    // Salva no banco incluindo o peso meta e a data de nascimento (se suportado pelo Prisma schema)
+    // Busca o perfil atual para comparar se o objetivo mudou
+    const existingProfile = await (prisma as any).userProfile.findUnique({
+      where: { id: 'main-user' },
+    });
+
+    // Salva no banco incluindo o peso meta e a data de nascimento
     const userProfile = await (prisma as any).userProfile.upsert({
       where: { id: 'main-user' },
       update: {
@@ -71,7 +75,7 @@ router.post('/profile', async (req, res) => {
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
         weightKg: Number(data.weightKg),
-        targetWeight: data.targetWeight ? Number(data.targetWeight) : null, // Salva o Peso Meta
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
         heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
@@ -83,13 +87,41 @@ router.post('/profile', async (req, res) => {
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         gender: data.gender,
         weightKg: Number(data.weightKg),
-        targetWeight: data.targetWeight ? Number(data.targetWeight) : null, // Salva o Peso Meta
+        targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
         heightCm: Number(data.heightCm),
         activityLevel: calculatedMetrics.calculatedActivityLevel,
         goal: data.goal,
         dailyCalorieTarget: calculatedMetrics.recommendedCalories,
       },
     });
+
+    // Se o objetivo (goal) foi alterado ou se não existe nenhum ciclo ativo, gerencia o ciclo para não perder a referência de datas
+    if (data.goal && (!existingProfile || existingProfile.goal !== data.goal)) {
+      const activeCycle = await (prisma as any).userCycle.findFirst({
+        where: { userId: 'main-user', endDate: null },
+        orderBy: { startDate: 'desc' }
+      });
+
+      const goalMappingText: Record<string, string> = {
+        'WEIGHT_LOSS': 'Emagrecimento e Condicionamento',
+        'MAINTENANCE': 'Manutenção de Condicionamento',
+        'SPEED': 'Concluir / Baixar Tempo nos 5 km',
+        'ENDURANCE': 'Resistência e Longão'
+      };
+      const formattedGoalName = goalMappingText[data.goal] || data.goal;
+
+      if (!activeCycle) {
+        // Se não houver ciclo ativo, cria um inicial retroativo ou atual para travar a data base das semanas
+        await (prisma as any).userCycle.create({
+          data: {
+            userId: 'main-user',
+            goalName: formattedGoalName,
+            startDate: new Date('2026-09-28T00:00:00'), // Mantém a data base original do seu ciclo atual
+            endDate: null,
+          }
+        });
+      }
+    }
 
     if (data.weightKg) {
       const weightValue = typeof data.weightKg === 'string' 
@@ -115,8 +147,7 @@ router.post('/profile', async (req, res) => {
   }
 });
 
-// GET: Retornar o perfil completo com peso meta e data de nascimento
-// GET: Retornar o perfil e métricas
+// GET: Retornar o perfil completo com peso meta, métricas e ciclo ativo
 router.get('/profile', async (req, res) => {
   try {
     const userProfile = await (prisma as any).userProfile.findUnique({
@@ -149,34 +180,7 @@ router.get('/profile', async (req, res) => {
       metrics: calculatedMetrics,
     });
   } catch (error: any) {
-    return res.status(500).json({ error: 'Erro ao buscar perfil.' });
-  }
-});
-
-// GET: Retornar o perfil e métricas recalculadas dinamicamente
-router.get('/profile', async (req, res) => {
-  try {
-    const userProfile = await (prisma as any).userProfile.findUnique({
-      where: { id: 'main-user' },
-    });
-
-    if (!userProfile) {
-      return res.status(404).json({ error: 'Perfil não configurado ainda.' });
-    }
-
-    const calculatedMetrics = await UserService.calculateMetricsDynamic({
-      age: userProfile.age,
-      gender: userProfile.gender as any,
-      weightKg: userProfile.weightKg,
-      heightCm: userProfile.heightCm,
-      goal: userProfile.goal as any,
-    });
-
-    return res.json({
-      profile: userProfile,
-      metrics: calculatedMetrics,
-    });
-  } catch (error: any) {
+    console.error('Erro ao buscar perfil:', error);
     return res.status(500).json({ error: 'Erro ao buscar perfil.' });
   }
 });
