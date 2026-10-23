@@ -182,27 +182,35 @@
 
       if (!cycleHistory || cycleHistory.length === 0) {
         cycleHistory = [
-          { id: 'cycle-5k-active', goalName: "Concluir / Baixar Tempo nos 5 km", startDate: '2026-10-19', endDate: null }
+          { id: 'cycle-5k-active', goalName: "Concluir / Baixar Tempo nos 5 km", startDate: '2026-10-04', endDate: null }
         ];
       }
+
+      // Filtra apenas o ciclo ativo principal e ciclos anteriores com nome diferente (evita duplicações de semanas)
+      const filteredCycles = [];
+      const seenGoals = new Set();
+
+      cycleHistory.forEach(cycle => {
+        const isCurrentlyActive = cycle.endDate === null;
+        if (isCurrentlyActive) {
+          filteredCycles.push(cycle);
+        } else if (!cycle.goalName.includes('Semana 1') && !cycle.goalName.includes('Semana 2')) {
+          if (!seenGoals.has(cycle.goalName)) {
+            seenGoals.add(cycle.goalName);
+            filteredCycles.push(cycle);
+          }
+        }
+      });
 
       const targetVolumeBase = 22.9;
       let fullCyclesHtml = '';
 
-      // Iterar sobre todos os ciclos cadastrados na tabela do Neon
-      cycleHistory.forEach(cycle => {
+      filteredCycles.forEach(cycle => {
         const cycleName = cycle.goalName || cycle.title || "Ciclo de Treinamento";
         const isCurrentlyActive = cycle.endDate === null;
         
-        // Data base inicial fixada no início real do bloco (04/10/2026 para o de 5k)
         let cycleStartDate = new Date(cycle.startDate || '2026-10-04T00:00:00');
         cycleStartDate.setHours(0, 0, 0, 0);
-
-        // Alinha a segunda-feira da semana base inicial
-        const startDay = cycleStartDate.getDay();
-        const diffStartToMonday = startDay === 0 ? -6 : (startDay === 1 ? 0 : 1 - startDay);
-        const cycleBaseMonday = new Date(cycleStartDate);
-        cycleBaseMonday.setDate(cycleStartDate.getDate() + diffStartToMonday);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -210,7 +218,7 @@
         let weeksList = [];
         
         if (isCurrentlyActive) {
-          // Para o ciclo ATIVO (5 km), renderiza explicitamente a Semana 1, Semana 2, Semana 3 (Atual) e Semana 4
+          // Renderiza a estrutura completa das 4 semanas no Card Ativo
           const weekRanges = [
             { weekNum: 1, start: new Date(2026, 9, 4), end: new Date(2026, 9, 11, 23, 59, 59) },   // 04/10 a 11/10
             { weekNum: 2, start: new Date(2026, 9, 12), end: new Date(2026, 9, 18, 23, 59, 59) },  // 12/10 a 18/10
@@ -297,11 +305,11 @@
               </div>
             `;
 
-            // Coloca a semana atual e mais recentes no topo da pilha do card
+            // Mantém a semana 4 e 3 no topo e as anteriores abaixo
             weeksList.unshift(weekHtmlBlock);
           });
         } else {
-          // Para ciclos ENCERRADOS (ex: Perda de Peso Progressiva), mostra como um bloco consolidado concluído
+          // Renderização do histórico anterior (ex: Perda de Peso Progressiva)
           const cycleEndDate = new Date(cycle.endDate);
           let totalKmInCycle = 0;
 
