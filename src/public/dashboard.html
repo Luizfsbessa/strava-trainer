@@ -386,20 +386,11 @@
         const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
         const PROGRESSION_RATE = 1.05;
 
-        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA DATA DE INÍCIO FIXA DO BANCO ---
-        let cycleStartDate;
-        if (activeCycle && activeCycle.startDate) {
-          cycleStartDate = new Date(activeCycle.startDate);
-        } else {
-          cycleStartDate = new Date('2026-09-28T00:00:00'); // Data base estável mantida
-        }
-
+        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA BASE FIXA ---
+        let cycleStartDate = new Date('2026-09-28T00:00:00'); 
         cycleStartDate.setHours(0, 0, 0, 0);
-        
-        // Diferença exata em dias corridos desde o início do ciclo até o momento atual
+
         const diffInDays = Math.max(0, Math.floor((now - cycleStartDate) / (1000 * 60 * 60 * 24)));
-        
-        // Número real da semana em andamento (ex: Dia 0 a 6 = Semana 1, Dia 7 a 13 = Semana 2, Dia 14 a 20 = Semana 3)
         const absoluteWeekNumber = Math.floor(diffInDays / 7) + 1;
 
         let cycleWeekName = '';
