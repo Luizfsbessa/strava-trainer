@@ -24,7 +24,6 @@
     .nav-links a { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
     .nav-links a:hover { border-color: var(--accent-blue); }
     
-    /* Abas Internas da Página de Histórico */
     .history-tabs { display: flex; gap: 10px; margin-bottom: 25px; }
     .history-tab-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .history-tab-btn:hover { border-color: var(--accent-blue); color: var(--text-main); }
@@ -93,9 +92,8 @@
     
     .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); }
 
-    /* Estilos para a Linha do Tempo de Ciclos */
     .cycle-block { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-    .cycle-title { font-size: 18px; color: var(--accent-blue); font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .cycle-title { font-size: 18px; color: var(--accent-blue); font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     .week-item { background: #070a12; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-top: 10px; display: flex; flex-direction: column; transition: all 0.2s; }
     .week-item:hover { border-color: var(--accent-blue); }
   </style>
@@ -115,13 +113,11 @@
       </div>
     </header>
 
-    <!-- Seletor de Abas Internas -->
     <div class="history-tabs">
       <button class="history-tab-btn active" onclick="switchHistoryTab('activities', event)">📅 Calendário e Atividades</button>
       <button class="history-tab-btn" onclick="switchHistoryTab('cycles', event)">📈 Linha do Tempo de Ciclos</button>
     </div>
 
-    <!-- Aba 1: Calendário e Atividades -->
     <div id="pane-activities" class="tab-pane active">
       <div class="calendar-card">
         <div class="calendar-header">
@@ -138,11 +134,8 @@
       <div id="history-container">Buscando dados do banco...</div>
     </div>
 
-    <!-- Aba 2: Linha do Tempo de Ciclos (Agrupada por Ciclos/Cards Próprios) -->
     <div id="pane-cycles" class="tab-pane">
-      <div id="cycles-list-container">
-        <!-- Renderização dinâmica dos Cards de Ciclos vindos da API PostgreSQL -->
-      </div>
+      <div id="cycles-list-container"></div>
     </div>
 
   </div>
@@ -151,6 +144,36 @@
     let globalWorkouts = [];
     let currentDisplayDate = new Date();
     let prRecords = {};
+
+    function getCycleSpecification(objective) {
+      const objStr = String(objective || "").toLowerCase();
+      if (objStr.includes("maratona") && !objStr.includes("meia")) {
+        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0 };
+      }
+      if (objStr.includes("meia") || objStr.includes("21")) {
+        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0 };
+      }
+      if (objStr.includes("10 km") || objStr.includes("10km")) {
+        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0 };
+      }
+      if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
+        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5 };
+      }
+      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0 };
+    }
+
+    function getWeekPhaseLabel(weekNum, totalWeeks) {
+      if (totalWeeks <= 4) {
+        return weekNum % 4 === 0 ? "Consolidação (Deload)" : "Queima Calórica";
+      }
+      if (weekNum === totalWeeks) return "Polimento Final (Taper)";
+      if (totalWeeks >= 12 && weekNum === totalWeeks - 1) return "Pré-Polimento";
+      if (weekNum % 4 === 0) return "Deload / Regenerativa";
+      const ratio = weekNum / totalWeeks;
+      if (ratio <= 0.35) return "Base Aeróbica";
+      if (ratio <= 0.70) return "Construção & Limiar";
+      return "Pico Específico";
+    }
 
     function switchHistoryTab(tabName, event) {
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
@@ -186,12 +209,12 @@
         ];
       }
 
-      const targetVolumeBase = 22.9;
       let fullCyclesHtml = '';
 
       cycleHistory.forEach(cycle => {
         const cycleName = cycle.goalName || cycle.title || "Ciclo de Treinamento";
         const isCurrentlyActive = cycle.endDate === null;
+        const spec = getCycleSpecification(cycleName);
         
         let cycleStartDate = new Date(cycle.startDate || '2026-10-04T00:00:00');
         cycleStartDate.setHours(0, 0, 0, 0);
@@ -200,15 +223,19 @@
         today.setHours(0, 0, 0, 0);
 
         let weeksList = [];
+        let activeHeaderBadge = '';
         
         if (isCurrentlyActive) {
-          // Calcula dinamicamente quantas semanas se passaram desde o início do ciclo até hoje
           const diffTime = Math.max(0, today - cycleStartDate);
           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
           const currentWeekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
+          
+          // Exibe todas as semanas planejadas do macrociclo (ou até a semana atual se ultrapassar o previsto)
+          const totalWeeksToRender = Math.max(spec.totalWeeks, currentWeekNumber);
 
-          // Renderiza da semana atual até a semana 1 de forma decrescente
-          for (let wNum = currentWeekNumber; wNum >= 1; wNum--) {
+          activeHeaderBadge = `<span style="font-size: 12px; color: var(--accent-blue); background: rgba(56,189,248,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3); margin-right: 6px;">Progresso: Semana ${currentWeekNumber} de ${spec.totalWeeks}</span>`;
+
+          for (let wNum = totalWeeksToRender; wNum >= 1; wNum--) {
             const wStart = new Date(cycleStartDate);
             wStart.setDate(cycleStartDate.getDate() + (wNum - 1) * 7);
 
@@ -217,6 +244,13 @@
             wEnd.setHours(23, 59, 59, 999);
 
             const isCurrentWeek = today >= wStart && today <= wEnd;
+            const phaseLabel = getWeekPhaseLabel(wNum, spec.totalWeeks);
+
+            // Alvo estrutural protegido da semana (aplicando progressão e fator de deload/taper)
+            const baseCurve = spec.baseWeeklyKm * Math.pow(1.04, Math.min(wNum - 1, spec.totalWeeks - 2));
+            let weekTarget = Math.max(spec.minFloorKm, baseCurve);
+            if (wNum % 4 === 0 && wNum < spec.totalWeeks) weekTarget *= 0.82;
+            if (wNum === spec.totalWeeks && spec.totalWeeks > 4) weekTarget *= 0.70;
 
             let kmDone = 0;
             let weekWorkouts = [];
@@ -236,12 +270,12 @@
             });
 
             let weekTitle = isCurrentWeek 
-              ? `Semana ${wNum}: Bloco Ativo (Semana Atual)` 
-              : `Semana ${wNum}: Registro de Treinos`;
+              ? `Semana ${wNum}/${spec.totalWeeks} — ${phaseLabel} (Atual)` 
+              : `Semana ${wNum}/${spec.totalWeeks} — ${phaseLabel}`;
 
             const statusTag = isCurrentWeek
               ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
-              : (weekWorkouts.length > 0 || today > wEnd ? `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>` : `<span style="color: var(--text-muted);">Futuro</span>`);
+              : (today > wEnd ? `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>` : `<span style="color: var(--text-muted);">Planejado</span>`);
 
             let workoutsListHtml = '';
             if (weekWorkouts.length > 0) {
@@ -271,7 +305,7 @@
             const weekUid = `active-w${wNum}`;
 
             const weekHtmlBlock = `
-              <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
+              <div class="week-item" style="margin-bottom: 12px; cursor: pointer; ${isCurrentWeek ? 'border-color: var(--accent-gold);' : ''}" onclick="toggleWeekDetails('${weekUid}')">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                   <div>
                     <strong style="color: var(--text-main);">${weekTitle}</strong>
@@ -280,7 +314,7 @@
                     </div>
                   </div>
                   <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
-                    <span>Alvo Base: <strong>${targetVolumeBase.toFixed(1)} km</strong></span>
+                    <span>Alvo Estrutural: <strong>${weekTarget.toFixed(1)} km</strong></span>
                     <span>Realizado: <strong style="color: var(--accent-blue);">${kmDone.toFixed(1)} km</strong></span>
                     ${statusTag}
                     <span id="arrow-week-${weekUid}" style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">${isCurrentWeek ? '▼' : '▲'}</span>
@@ -297,7 +331,6 @@
             weeksList.push(weekHtmlBlock);
           }
         } else {
-          // Ciclos encerrados (ex: Perda de Peso)
           const cycleEndDate = new Date(cycle.endDate);
           let totalKmInCycle = 0;
 
@@ -333,17 +366,17 @@
         }
 
         const badgeTag = isCurrentlyActive
-          ? `<span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>`
+          ? `${activeHeaderBadge}<span style="font-size: 12px; color: var(--accent-gold); background: rgba(245,158,11,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);">Ativo</span>`
           : `<span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">Histórico</span>`;
 
         fullCyclesHtml += `
           <div class="cycle-block" style="margin-bottom: 24px;">
             <div class="cycle-title">
               <span>🎯 Ciclo: ${cycleName}</span>
-              ${badgeTag}
+              <div>${badgeTag}</div>
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
-              Acompanhamento do progresso semanal baseado na sua diretriz de treinamento.
+              Periodização completa com proteção de volume mínimo e mesociclos regenerativos (3:1).
             </p>
             <div>${weeksList.join('')}</div>
           </div>
@@ -401,7 +434,6 @@
         }
       });
 
-      // Metas de distâncias oficiais para PRs (em quilómetros)
       let prsTargets = {
         '1km': { target: 1.0, bestId: null, bestTime: Infinity, label: '🏆 PR 1 km' },
         '5k': { target: 5.0, bestId: null, bestTime: Infinity, label: '🏆 PR 5K' },
@@ -418,7 +450,6 @@
         const id = w.id;
         if (!id) return;
 
-        // 1. Registo de Maior Distância absoluta
         if (distKm > maxDist && distKm > 1) {
           maxDist = distKm;
           maxDistId = id;
@@ -432,10 +463,8 @@
         if (distKm > 0 && durationSec > 0) {
           Object.keys(prsTargets).forEach(key => {
             const item = prsTargets[key];
-            // Rigoroso: O treino precisa ter atingido a distância alvo (ex: 5.0 km para o 5K)
             if (distKm >= item.target) {
               let effectiveTime = durationSec;
-              // Se o treino foi mais longo (ex: um longão de 10km), calcula o tempo proporcional para o 5K
               if (distKm > item.target * 1.05) {
                 effectiveTime = (durationSec / distKm) * item.target;
               }
@@ -448,12 +477,10 @@
         }
       });
 
-      // Atribui a badge de Maior Distância
       if (maxDistId && prRecords.recordsMap[maxDistId]) {
         prRecords.recordsMap[maxDistId].push(`🏆 Maior Distância (${maxDist.toFixed(1)}km)`);
       }
 
-      // Atribui as badges de PRs reais baseados nas distâncias cumpridas
       Object.keys(prsTargets).forEach(key => {
         const item = prsTargets[key];
         if (item.bestId && prRecords.recordsMap[item.bestId]) {

@@ -195,7 +195,7 @@
         <div class="metric-value highlight" id="m-week-km">0.0 km</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Volume Alvo (Dinâmico)</div>
+        <div class="metric-label">Volume Alvo (Protegido)</div>
         <div class="metric-value" id="m-target-km">0.0 km</div>
         <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
       </div>
@@ -295,6 +295,54 @@
   <script>
     document.getElementById('activityDate').valueAsDate = new Date();
 
+    // --- CONFIGURAÇÃO DE PERIODIZAÇÃO POR MODALIDADE (MACROCICLOS E PISOS DE VOLUME) ---
+    function getCycleSpecification(objective) {
+      const objStr = String(objective || "").toLowerCase();
+      if (objStr.includes("maratona") && !objStr.includes("meia")) {
+        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0, label: "Maratona (42 km)" };
+      }
+      if (objStr.includes("meia") || objStr.includes("21")) {
+        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0, label: "Meia Maratona (21 km)" };
+      }
+      if (objStr.includes("10 km") || objStr.includes("10km")) {
+        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0, label: "10 km (Resistência & Pace)" };
+      }
+      if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
+        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5, label: "5 km (Velocidade)" };
+      }
+      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0, label: "Perda de Peso Progressiva" };
+    }
+
+    // --- DETERMINA A FASE FISIOLÓGICA DINÂMICA DENTRO DO MACROCICLO ---
+    function getCyclePhaseDetails(weekNum, totalWeeks) {
+      if (totalWeeks <= 4) {
+        if (weekNum % 4 === 0) return { name: `Semana ${weekNum}: Consolidação Metabólica (Deload)`, factor: 0.85 };
+        return { name: `Semana ${weekNum}: Queima Calórica Progressiva`, factor: 1.05 };
+      }
+
+      // Última(s) semana(s) de qualquer ciclo de prova = Polimento (Taper)
+      if (weekNum === totalWeeks) {
+        return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final (Taper)`, factor: 0.70 };
+      }
+      if (totalWeeks >= 12 && weekNum === totalWeeks - 1) {
+        return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento (Redução de Carga)`, factor: 0.85 };
+      }
+
+      // Regra 3:1 -> A cada 4 semanas (Sem 4, Sem 8, Sem 12), aplica Deload regenerativo
+      if (weekNum % 4 === 0) {
+        return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.82 };
+      }
+
+      const progressRatio = weekNum / totalWeeks;
+      if (progressRatio <= 0.35) {
+        return { name: `Semana ${weekNum}/${totalWeeks}: Base Aeróbica e Adaptação`, factor: 1.05 };
+      }
+      if (progressRatio <= 0.70) {
+        return { name: `Semana ${weekNum}/${totalWeeks}: Construção e Limiar`, factor: 1.07 };
+      }
+      return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.08 };
+    }
+
     async function loadDashboard() {
       try {
         const response = await fetch('/api/workouts');
@@ -303,7 +351,6 @@
         
         const workouts = Array.isArray(data) ? data : (data.workouts || []);
         
-        // Busca direta e segura do perfil atualizado para garantir o peso correto do PostgreSQL
         let rawProfile = data.profile || {};
         try {
           const profileRes = await fetch('/api/user/profile');
@@ -315,7 +362,6 @@
           console.warn('Erro ao carregar perfil dedicado:', e);
         }
         
-        // 1. Busca o ciclo ativo do banco de dados (Prisma PostgreSQL)
         let activeCycle = null;
         try {
           const cyclesRes = await fetch('/api/user/cycles');
@@ -341,6 +387,7 @@
           objective: savedObjective
         };
 
+        const cycleSpec = getCycleSpecification(profile.objective);
         const objectiveConfig = getObjectiveMatrix(profile.objective);
         document.getElementById('m-objective-label').innerText = objectiveConfig.text;
 
@@ -393,25 +440,29 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        const DEFAULT_INITIAL_KM = 20.6;
-        const baseVolForProgression = previousWeekKm > 0 ? previousWeekKm : DEFAULT_INITIAL_KM;
-        const PROGRESSION_RATE = 1.05;
-
-        // --- CÁLCULO EXATO DA SEMANA DO CICLO A PARTIR DA BASE DE 04/10 ---
-        let cycleStartDate = new Date('2026-10-04T00:00:00'); 
+        // --- CÁLCULO DA SEMANA DENTRO DO MACROCICLO ---
+        let cycleStartDate = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-10-04T00:00:00');
         cycleStartDate.setHours(0, 0, 0, 0);
 
         const diffInDays = Math.max(0, Math.floor((now - cycleStartDate) / (1000 * 60 * 60 * 24)));
         const absoluteWeekNumber = Math.floor(diffInDays / 7) + 1;
 
-        let cycleWeekName = '';
-        if (absoluteWeekNumber === 1) cycleWeekName = 'Semana 1: Adaptação Inicial e Base';
-        else if (absoluteWeekNumber === 2) cycleWeekName = 'Semana 2: Ritmo e Densidade';
-        else if (absoluteWeekNumber === 3) cycleWeekName = 'Semana 3: Pico de Carga';
-        else if (absoluteWeekNumber === 4) cycleWeekName = 'Semana 4: Deload / Regenerativa';
-        else cycleWeekName = `Semana ${absoluteWeekNumber}: Bloco Avançado`;
+        const phaseInfo = getCyclePhaseDetails(absoluteWeekNumber, cycleSpec.totalWeeks);
 
-        const dynamicTargetKm = baseVolForProgression * PROGRESSION_RATE * objectiveConfig.volumeMultiplier;
+        // --- PROTEÇÃO DE PISO DE QUILOMETRAGEM (SAFETY FLOOR) ---
+        // Impede que uma semana com baixa rodagem (ex: imprevistos) colapse as metas futuras do ciclo
+        const expectedCurveVolume = cycleSpec.baseWeeklyKm * Math.pow(1.04, Math.min(absoluteWeekNumber - 1, cycleSpec.totalWeeks - 2));
+        const protectedFloor = Math.max(cycleSpec.minFloorKm, expectedCurveVolume * 0.80);
+
+        const effectiveBaseKm = Math.max(previousWeekKm, protectedFloor);
+        const rawDynamicTarget = effectiveBaseKm * phaseInfo.factor;
+        
+        // Trava de segurança: nunca cai abaixo do piso absoluto da modalidade (exceto no Taper final)
+        const isTaperWeek = phaseInfo.factor < 0.80;
+        const dynamicTargetKm = isTaperWeek 
+          ? Math.max(cycleSpec.minFloorKm * 0.70, rawDynamicTarget) 
+          : Math.max(cycleSpec.minFloorKm, rawDynamicTarget);
+
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
@@ -428,10 +479,14 @@
         document.getElementById('subtitle-info').innerText = `Perfil Ativo (Idade: ${profile.age} anos) | Pace Base Calculado: ${formatPace(basePaceSecs)} /km`;
         document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
         document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
-        document.getElementById('m-cycle-phase').innerText = cycleWeekName;
+        document.getElementById('m-cycle-phase').innerText = phaseInfo.name;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Ciclo Atual:</strong> ${cycleWeekName}.`;
+        const floorNotice = previousWeekKm < protectedFloor 
+          ? `<span style="color: var(--accent-blue); font-size: 11px; display: block; margin-top: 4px;">🛡️ Piso de proteção ativo (${protectedFloor.toFixed(1)} km): mantendo a curva estrutural do ciclo apesar da variação da semana anterior.</span>` 
+          : '';
+
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Macrociclo:</strong> ${phaseInfo.name}.${floorNotice}`;
 
         const sessionsContainer = document.getElementById('sessions-container');
         const evaluatedSessions = objectiveConfig.getSessions(dynamicTargetKm, basePaceSecs);
@@ -521,7 +576,7 @@
       if (zoneUpper.includes('Z3') || zoneUpper.includes('MODERADO')) {
         return '6:00 - 6:40 /km';
       }
-      if (zoneUpper.includes('Z2') || zoneUpper.includes('QUEIMA DE GORDURA')) {
+      if (zoneUpper.includes('Z2') || zoneUpper.includes('QUEIMA DE GORDURA') || zoneUpper.includes('RESISTÊNCIA')) {
         return '6:50 - 7:35 /km';
       }
       if (zoneUpper.includes('Z1') || zoneUpper.includes('REGENERATIVO') || zoneUpper.includes('MUITO LEVE')) {
@@ -539,12 +594,81 @@
     function getObjectiveMatrix(objective) {
       const objStr = String(objective || "").toLowerCase();
 
-      if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
+      if (objStr.includes("maratona") && !objStr.includes("meia")) {
         return {
-          text: "Meta: 5 km (Velocidade)",
-          volumeMultiplier: 1.0,
-          rationale: "Motor em modo <strong>5 km</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
-          getSessions: (target, basePace) => {
+          text: "Meta: Maratona (42 km - 16 Semanas)",
+          rationale: "Motor em modo <strong>Maratona (16 Semanas)</strong>: Alta densidade aeróbica (Z2/Z3), resistência muscular prolongada e longões estruturados.",
+          getSessions: (target) => {
+            const intK = parseFloat((target * 0.20).toFixed(1));
+            const easyK = parseFloat((target * 0.30).toFixed(1));
+            const longK = parseFloat((target * 0.50).toFixed(1));
+
+            return [
+              { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade & Core Estabilizador", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "35 min", description: "Prevenção de lesões articulares e fortalecimento de quadril.", effort: "Estabilidade", videoSearchTerm: "Mobilidade para maratonistas" },
+              { 
+                dayOfWeek: "Terça-feira", sessionType: "Limiar Longo (Tempo Run)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intK} km`, description: "Sustentação de ritmo forte para economia de corrida.", effort: "Forte controlado", videoSearchTerm: "Treino tempo run maratona",
+                steps: [
+                  { label: "Aquecimento", detail: "2.0 km trote leve (Z1)" },
+                  { label: "Bloco Principal", detail: `${Math.max(3, (intK - 3.0)).toFixed(1)} km contínuo em Z4 (Limiar)` },
+                  { label: "Desaquecimento", detail: "1.0 km trote regenerativo" }
+                ]
+              },
+              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `6.0 km`, description: "Recuperação ativa pós-limiar.", effort: "Confortável", videoSearchTerm: "Rodagem regenerativa corrida" },
+              { 
+                dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico de Maratona (MP)", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${easyK} km`, description: "Adaptação metabólica ao pace da prova.", effort: "Constante", videoSearchTerm: "Ritmo de maratona treino",
+                steps: [
+                  { label: "Aquecimento", detail: "2.0 km trote progressivo" },
+                  { label: "Ritmo de Prova", detail: `${Math.max(4, (easyK - 3.0)).toFixed(1)} km travado no pace alvo de prova` },
+                  { label: "Desaquecimento", detail: "1.0 km trote leve" }
+                ]
+              },
+              { dayOfWeek: "Sexta-feira", sessionType: "Descanso Total / Liberação", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Supercompensação pré-longão.", effort: "Repouso", videoSearchTerm: "" },
+              { dayOfWeek: "Sábado", sessionType: "Longão de Resistência", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longK} km`, description: "Treino chave da semana para adaptação de glicogênio e fibras lentas.", effort: "Conversacional constante", videoSearchTerm: "Treino longo maratona" },
+              { dayOfWeek: "Domingo", sessionType: "Descanso Ativo / Caminhada", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação articular.", effort: "Repouso", videoSearchTerm: "" }
+            ];
+          }
+        };
+      }
+      else if (objStr.includes("meia") || objStr.includes("21")) {
+        return {
+          text: "Meta: Meia Maratona (21 km - 12 Semanas)",
+          rationale: "Motor em modo <strong>Meia Maratona (12 Semanas)</strong>: Equilíbrio entre resistência aeróbica e sustentação de limiar (Z3/Z4).",
+          getSessions: (target) => {
+            const intK = parseFloat((target * 0.22).toFixed(1));
+            const easyK = parseFloat((target * 0.33).toFixed(1));
+            const longK = parseFloat((target * 0.45).toFixed(1));
+
+            return [
+              { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Articular", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "30 min", description: "Soltura de quadril e tornozelos.", effort: "Amplitude", videoSearchTerm: "Mobilidade meia maratona" },
+              { 
+                dayOfWeek: "Terça-feira", sessionType: "Intervalado Longo (1k - 2k)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intK} km`, description: "Repetições longas para tolerância ao lactato.", effort: "Duro controlado", videoSearchTerm: "Treino intervalado 21km",
+                steps: [
+                  { label: "Aquecimento", detail: "2.0 km trote leve" },
+                  { label: "Bloco Principal", detail: `${Math.max(2, Math.round((intK - 3.0) / 1.5))}x 1.5 km forte / 2 min trote leve` },
+                  { label: "Desaquecimento", detail: "1.0 km trote solto" }
+                ]
+              },
+              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `5.0 km`, description: "Recuperação ativa leve.", effort: "Leve", videoSearchTerm: "Rodagem leve" },
+              { 
+                dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Meia Maratona", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${easyK} km`, description: "Bloco contínuo no ritmo alvo dos 21 km.", effort: "Constante", videoSearchTerm: "Ritmo meia maratona",
+                steps: [
+                  { label: "Aquecimento", detail: "1.5 km trote leve" },
+                  { label: "Bloco Contínuo", detail: `${Math.max(3, (easyK - 2.5)).toFixed(1)} km em ritmo constante Z3` },
+                  { label: "Desaquecimento", detail: "1.0 km trote leve" }
+                ]
+              },
+              { dayOfWeek: "Sexta-feira", sessionType: "Descanso / Mobilidade", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "20 min", description: "Recuperação pré-longo.", effort: "Soltura", videoSearchTerm: "" },
+              { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longK} km`, description: "Construção de resistência aeróbica.", effort: "Constante", videoSearchTerm: "Treino longo 21km" },
+              { dayOfWeek: "Domingo", sessionType: "Descanso Total", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.", effort: "Repouso", videoSearchTerm: "" }
+            ];
+          }
+        };
+      }
+      else if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
+        return {
+          text: "Meta: 5 km (Velocidade - 8 Semanas)",
+          rationale: "Motor em modo <strong>5 km (8 Semanas)</strong>: Foco em tiros curtos, ganho de VO2Max (Z5) e cadência alta.",
+          getSessions: (target) => {
             const intK = parseFloat((target * 0.25).toFixed(1));
             const easyK = parseFloat((target * 0.35).toFixed(1));
             const longK = parseFloat((target * 0.40).toFixed(1));
@@ -587,10 +711,9 @@
       } 
       else if (objStr.includes("10 km") || objStr.includes("10km")) {
         return {
-          text: "Meta: 10 km (Resistência & Pace)",
-          volumeMultiplier: 1.1,
-          rationale: "Motor em modo <strong>10 km</strong>: Foco em limiar anaeróbico (Z4) e expansão da resistência de base.",
-          getSessions: (target, basePace) => {
+          text: "Meta: 10 km (Resistência - 10 Semanas)",
+          rationale: "Motor em modo <strong>10 km (10 Semanas)</strong>: Foco em limiar anaeróbico (Z4) e expansão da resistência de base.",
+          getSessions: (target) => {
             const intK = parseFloat((target * 0.25).toFixed(1));
             const easyK = parseFloat((target * 0.35).toFixed(1));
             const longK = parseFloat((target * 0.40).toFixed(1));
@@ -623,10 +746,9 @@
       } 
       else {
         return {
-          text: "Perda de Peso Progressiva",
-          volumeMultiplier: 1.0,
+          text: "Perda de Peso Progressiva (Ciclos 4 Sem.)",
           rationale: "Motor em modo <strong>Perda de Peso</strong>: Foco em constância em Z2 (zona ideal de queima de gordura) e gasto calórico otimizado.",
-          getSessions: (target, basePace) => {
+          getSessions: (target) => {
             const intK = parseFloat((target * 0.25).toFixed(1));
             const easyK = parseFloat((target * 0.35).toFixed(1));
             const longK = parseFloat((target * 0.40).toFixed(1));
