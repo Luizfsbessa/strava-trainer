@@ -148,25 +148,25 @@
     function getCycleSpecification(objective) {
       const objStr = String(objective || "").toLowerCase();
       if (objStr.includes("maratona") && !objStr.includes("meia")) {
-        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0 };
+        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0, raceDistKm: 42.2, isRaceCycle: true };
       }
       if (objStr.includes("meia") || objStr.includes("21")) {
-        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0 };
+        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0, raceDistKm: 21.1, isRaceCycle: true };
       }
       if (objStr.includes("10 km") || objStr.includes("10km")) {
-        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0 };
+        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0, raceDistKm: 10.0, isRaceCycle: true };
       }
       if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
-        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5 };
+        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5, raceDistKm: 5.0, isRaceCycle: true };
       }
-      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0 };
+      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0, raceDistKm: 0, isRaceCycle: false };
     }
 
-    function getWeekPhaseLabel(weekNum, totalWeeks) {
-      if (totalWeeks <= 4) {
+    function getWeekPhaseLabel(weekNum, totalWeeks, isRaceCycle) {
+      if (!isRaceCycle) {
         return weekNum % 4 === 0 ? "Consolidação (Deload)" : "Queima Calórica";
       }
-      if (weekNum === totalWeeks) return "Polimento Final (Taper)";
+      if (weekNum === totalWeeks) return "Polimento Final & Dia da Prova 🏆";
       if (totalWeeks >= 12 && weekNum === totalWeeks - 1) return "Pré-Polimento";
       if (weekNum % 4 === 0) return "Deload / Regenerativa";
       const ratio = weekNum / totalWeeks;
@@ -219,6 +219,10 @@
         let cycleStartDate = new Date(cycle.startDate || '2026-10-04T00:00:00');
         cycleStartDate.setHours(0, 0, 0, 0);
 
+        const raceDayDate = new Date(cycleStartDate);
+        raceDayDate.setDate(cycleStartDate.getDate() + (spec.totalWeeks * 7) - 1);
+        const raceDayFormatted = raceDayDate.toLocaleDateString('pt-BR');
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -230,10 +234,13 @@
           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
           const currentWeekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
           
-          // Exibe todas as semanas planejadas do macrociclo (ou até a semana atual se ultrapassar o previsto)
           const totalWeeksToRender = Math.max(spec.totalWeeks, currentWeekNumber);
 
-          activeHeaderBadge = `<span style="font-size: 12px; color: var(--accent-blue); background: rgba(56,189,248,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3); margin-right: 6px;">Progresso: Semana ${currentWeekNumber} de ${spec.totalWeeks}</span>`;
+          const raceTagHeader = spec.isRaceCycle 
+            ? `<span style="font-size: 12px; color: #10b981; background: rgba(16,185,129,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); margin-right: 6px;">🏁 Prova: ${raceDayFormatted}</span>` 
+            : '';
+
+          activeHeaderBadge = `${raceTagHeader}<span style="font-size: 12px; color: var(--accent-blue); background: rgba(56,189,248,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3); margin-right: 6px;">Semana ${currentWeekNumber} de ${spec.totalWeeks}</span>`;
 
           for (let wNum = totalWeeksToRender; wNum >= 1; wNum--) {
             const wStart = new Date(cycleStartDate);
@@ -244,13 +251,13 @@
             wEnd.setHours(23, 59, 59, 999);
 
             const isCurrentWeek = today >= wStart && today <= wEnd;
-            const phaseLabel = getWeekPhaseLabel(wNum, spec.totalWeeks);
+            const isRaceWeek = spec.isRaceCycle && wNum === spec.totalWeeks;
+            const phaseLabel = getWeekPhaseLabel(wNum, spec.totalWeeks, spec.isRaceCycle);
 
-            // Alvo estrutural protegido da semana (aplicando progressão e fator de deload/taper)
             const baseCurve = spec.baseWeeklyKm * Math.pow(1.04, Math.min(wNum - 1, spec.totalWeeks - 2));
             let weekTarget = Math.max(spec.minFloorKm, baseCurve);
             if (wNum % 4 === 0 && wNum < spec.totalWeeks) weekTarget *= 0.82;
-            if (wNum === spec.totalWeeks && spec.totalWeeks > 4) weekTarget *= 0.70;
+            if (isRaceWeek) weekTarget = Math.max(spec.raceDistKm + 4.0, spec.minFloorKm * 0.65);
 
             let kmDone = 0;
             let weekWorkouts = [];
@@ -298,19 +305,24 @@
                   </div>
                 `;
               }).join('');
+            } else if (isRaceWeek) {
+              workoutsListHtml = `<div style="font-size: 12px; color: var(--accent-gold); padding: 8px 0;">🏆 Dia da Prova / Teste Alvo programado para encerramento no domingo (<strong>${raceDayFormatted}</strong>).</div>`;
             } else {
               workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
             }
 
             const weekUid = `active-w${wNum}`;
+            const weekBorderStyle = isCurrentWeek 
+              ? 'border-color: var(--accent-gold);' 
+              : (isRaceWeek ? 'border-color: rgba(16, 185, 129, 0.5); background: linear-gradient(135deg, #070a12 0%, #071913 100%);' : '');
 
             const weekHtmlBlock = `
-              <div class="week-item" style="margin-bottom: 12px; cursor: pointer; ${isCurrentWeek ? 'border-color: var(--accent-gold);' : ''}" onclick="toggleWeekDetails('${weekUid}')">
+              <div class="week-item" style="margin-bottom: 12px; cursor: pointer; ${weekBorderStyle}" onclick="toggleWeekDetails('${weekUid}')">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                   <div>
                     <strong style="color: var(--text-main);">${weekTitle}</strong>
                     <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                      Período: ${wStart.toLocaleDateString('pt-BR')} a ${wEnd.toLocaleDateString('pt-BR')} (Clique para expandir)
+                      Período: ${wStart.toLocaleDateString('pt-BR')} a ${wEnd.toLocaleDateString('pt-BR')} ${isRaceWeek ? `• <strong style="color: #10b981;">Dia da Prova: ${raceDayFormatted}</strong>` : '(Clique para expandir)'}
                     </div>
                   </div>
                   <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
@@ -376,7 +388,7 @@
               <div>${badgeTag}</div>
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
-              Periodização completa com proteção de volume mínimo e mesociclos regenerativos (3:1).
+              Periodização completa com proteção de volume mínimo, mesociclos regenerativos (3:1) e polimento final para o dia da prova.
             </p>
             <div>${weeksList.join('')}</div>
           </div>

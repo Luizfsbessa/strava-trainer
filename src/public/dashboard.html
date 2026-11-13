@@ -96,6 +96,11 @@
       position: relative; 
     }
     .card:hover { border-color: var(--border-glow); transform: translateY(-1px); }
+    .card.race-day-card {
+      border: 1px solid var(--accent-yellow);
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b0b 100%);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+    }
     .day { font-weight: 700; color: var(--accent-blue); text-transform: uppercase; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
     .type { font-size: 15px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
     .desc { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
@@ -153,6 +158,7 @@
     .z3 { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
     .z4 { background: rgba(249, 115, 22, 0.12); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.25); }
     .z5 { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+    .race-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.5); }
 
     .tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(3, 105, 161, 0.2); color: #38bdf8; border: 1px solid rgba(3, 105, 161, 0.4); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
     .tag:hover { background: rgba(3, 105, 161, 0.4); color: #fff; }
@@ -295,52 +301,52 @@
   <script>
     document.getElementById('activityDate').valueAsDate = new Date();
 
-    // --- CONFIGURAÇÃO DE PERIODIZAÇÃO POR MODALIDADE (MACROCICLOS E PISOS DE VOLUME) ---
+    // --- CONFIGURAÇÃO DE PERIODIZAÇÃO POR MODALIDADE (MACROCICLOS, PISOS E DISTÂNCIA DA PROVA) ---
     function getCycleSpecification(objective) {
       const objStr = String(objective || "").toLowerCase();
       if (objStr.includes("maratona") && !objStr.includes("meia")) {
-        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0, label: "Maratona (42 km)" };
+        return { totalWeeks: 16, baseWeeklyKm: 42.0, minFloorKm: 34.0, raceDistKm: 42.2, label: "Maratona (42 km)", isRaceCycle: true };
       }
       if (objStr.includes("meia") || objStr.includes("21")) {
-        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0, label: "Meia Maratona (21 km)" };
+        return { totalWeeks: 12, baseWeeklyKm: 30.0, minFloorKm: 24.0, raceDistKm: 21.1, label: "Meia Maratona (21 km)", isRaceCycle: true };
       }
       if (objStr.includes("10 km") || objStr.includes("10km")) {
-        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0, label: "10 km (Resistência & Pace)" };
+        return { totalWeeks: 10, baseWeeklyKm: 24.0, minFloorKm: 19.0, raceDistKm: 10.0, label: "10 km (Resistência & Pace)", isRaceCycle: true };
       }
       if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
-        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5, label: "5 km (Velocidade)" };
+        return { totalWeeks: 8, baseWeeklyKm: 20.6, minFloorKm: 16.5, raceDistKm: 5.0, label: "5 km (Velocidade)", isRaceCycle: true };
       }
-      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0, label: "Perda de Peso Progressiva" };
+      return { totalWeeks: 4, baseWeeklyKm: 18.0, minFloorKm: 14.0, raceDistKm: 0, label: "Perda de Peso Progressiva", isRaceCycle: false };
     }
 
     // --- DETERMINA A FASE FISIOLÓGICA DINÂMICA DENTRO DO MACROCICLO ---
-    function getCyclePhaseDetails(weekNum, totalWeeks) {
-      if (totalWeeks <= 4) {
-        if (weekNum % 4 === 0) return { name: `Semana ${weekNum}: Consolidação Metabólica (Deload)`, factor: 0.85 };
-        return { name: `Semana ${weekNum}: Queima Calórica Progressiva`, factor: 1.05 };
+    function getCyclePhaseDetails(weekNum, totalWeeks, isRaceCycle) {
+      if (!isRaceCycle) {
+        if (weekNum % 4 === 0) return { name: `Semana ${weekNum}: Consolidação Metabólica (Deload)`, factor: 0.85, isRaceWeek: false };
+        return { name: `Semana ${weekNum}: Queima Calórica Progressiva`, factor: 1.05, isRaceWeek: false };
       }
 
-      // Última(s) semana(s) de qualquer ciclo de prova = Polimento (Taper)
+      // Última semana do ciclo = Polimento Final + Dia da Prova no encerramento
       if (weekNum === totalWeeks) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final (Taper)`, factor: 0.70 };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final & Dia da Prova 🏆`, factor: 0.65, isRaceWeek: true };
       }
       if (totalWeeks >= 12 && weekNum === totalWeeks - 1) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento (Redução de Carga)`, factor: 0.85 };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento (Redução de Carga)`, factor: 0.85, isRaceWeek: false };
       }
 
       // Regra 3:1 -> A cada 4 semanas (Sem 4, Sem 8, Sem 12), aplica Deload regenerativo
       if (weekNum % 4 === 0) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.82 };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.82, isRaceWeek: false };
       }
 
       const progressRatio = weekNum / totalWeeks;
       if (progressRatio <= 0.35) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Base Aeróbica e Adaptação`, factor: 1.05 };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Base Aeróbica e Adaptação`, factor: 1.05, isRaceWeek: false };
       }
       if (progressRatio <= 0.70) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Construção e Limiar`, factor: 1.07 };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Construção e Limiar`, factor: 1.07, isRaceWeek: false };
       }
-      return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.08 };
+      return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.08, isRaceWeek: false };
     }
 
     async function loadDashboard() {
@@ -440,27 +446,29 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // --- CÁLCULO DA SEMANA DENTRO DO MACROCICLO ---
+        // --- CÁLCULO DA SEMANA DENTRO DO MACROCICLO E DATA DA PROVA ---
         let cycleStartDate = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-10-04T00:00:00');
         cycleStartDate.setHours(0, 0, 0, 0);
+
+        // Último dia do ciclo (Domingo da semana final) = Dia da Prova
+        const raceDayDate = new Date(cycleStartDate);
+        raceDayDate.setDate(cycleStartDate.getDate() + (cycleSpec.totalWeeks * 7) - 1);
+        const raceDayFormatted = raceDayDate.toLocaleDateString('pt-BR');
 
         const diffInDays = Math.max(0, Math.floor((now - cycleStartDate) / (1000 * 60 * 60 * 24)));
         const absoluteWeekNumber = Math.floor(diffInDays / 7) + 1;
 
-        const phaseInfo = getCyclePhaseDetails(absoluteWeekNumber, cycleSpec.totalWeeks);
+        const phaseInfo = getCyclePhaseDetails(absoluteWeekNumber, cycleSpec.totalWeeks, cycleSpec.isRaceCycle);
 
         // --- PROTEÇÃO DE PISO DE QUILOMETRAGEM (SAFETY FLOOR) ---
-        // Impede que uma semana com baixa rodagem (ex: imprevistos) colapse as metas futuras do ciclo
         const expectedCurveVolume = cycleSpec.baseWeeklyKm * Math.pow(1.04, Math.min(absoluteWeekNumber - 1, cycleSpec.totalWeeks - 2));
         const protectedFloor = Math.max(cycleSpec.minFloorKm, expectedCurveVolume * 0.80);
 
         const effectiveBaseKm = Math.max(previousWeekKm, protectedFloor);
         const rawDynamicTarget = effectiveBaseKm * phaseInfo.factor;
         
-        // Trava de segurança: nunca cai abaixo do piso absoluto da modalidade (exceto no Taper final)
-        const isTaperWeek = phaseInfo.factor < 0.80;
-        const dynamicTargetKm = isTaperWeek 
-          ? Math.max(cycleSpec.minFloorKm * 0.70, rawDynamicTarget) 
+        const dynamicTargetKm = phaseInfo.isRaceWeek
+          ? Math.max(cycleSpec.raceDistKm + 4.0, cycleSpec.minFloorKm * 0.65)
           : Math.max(cycleSpec.minFloorKm, rawDynamicTarget);
 
         const basePaceSecs = calculateBasePace(workouts);
@@ -482,20 +490,52 @@
         document.getElementById('m-cycle-phase').innerText = phaseInfo.name;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
-        const floorNotice = previousWeekKm < protectedFloor 
+        const raceBannerHtml = cycleSpec.isRaceCycle 
+          ? `<span style="color: var(--accent-green); font-size: 11px; display: block; margin-top: 4px;">🏁 Data Alvo / Dia da Prova (Encerramento do Ciclo): <strong>${raceDayFormatted}</strong></span>` 
+          : '';
+
+        const floorNotice = (!phaseInfo.isRaceWeek && previousWeekKm < protectedFloor)
           ? `<span style="color: var(--accent-blue); font-size: 11px; display: block; margin-top: 4px;">🛡️ Piso de proteção ativo (${protectedFloor.toFixed(1)} km): mantendo a curva estrutural do ciclo apesar da variação da semana anterior.</span>` 
           : '';
 
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Macrociclo:</strong> ${phaseInfo.name}.${floorNotice}`;
+        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Macrociclo:</strong> ${phaseInfo.name}.${raceBannerHtml}${floorNotice}`;
 
         const sessionsContainer = document.getElementById('sessions-container');
-        const evaluatedSessions = objectiveConfig.getSessions(dynamicTargetKm, basePaceSecs);
+        let evaluatedSessions = objectiveConfig.getSessions(dynamicTargetKm);
+
+        // --- MODULAÇÃO AUTOMÁTICA DA SEMANA DA PROVA (POLIMENTO + RACE DAY NO DOMINGO) ---
+        if (phaseInfo.isRaceWeek && cycleSpec.isRaceCycle) {
+          evaluatedSessions = [
+            { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Leve & Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "20 min", description: "Soltura articular suave sem fadiga muscular.", effort: "Muito leve", videoSearchTerm: "Mobilidade pré prova corrida" },
+            { 
+              dayOfWeek: "Terça-feira", sessionType: "Ativação Neuromuscular (Polimento)", zone: "Z4", zoneDesc: "Estímulo Curto", isRun: true, suggestedDist: `4.0 km`, description: "Volume baixo com tiros curtos apenas para manter o tônus e a cadência.", effort: "Solto e rápido", videoSearchTerm: "Treino semana de prova 5km 10km",
+              steps: [
+                { label: "Aquecimento", detail: "1.5 km trote bem leve (Z1)" },
+                { label: "Ativação", detail: "4x 200m em ritmo de prova / 200m caminhando" },
+                { label: "Desaquecimento", detail: "1.0 km trote muito leve" }
+              ]
+            },
+            { dayOfWeek: "Quarta-feira", sessionType: "Descanso Total / Hidratação", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Foco em sono, hidratação e estoque de glicogênio.", effort: "Repouso", videoSearchTerm: "" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Rodagem Muito Leve (Soltura)", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `3.0 km`, description: "Trote regenerativo curto em ritmo conversacional.", effort: "Confortável", videoSearchTerm: "" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Descanso Total (Pré-Prova)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa do sistema nervoso central.", effort: "Repouso", videoSearchTerm: "" },
+            { dayOfWeek: "Sábado", sessionType: "Shakeout Run (Trote de Ativação)", zone: "Z1", zoneDesc: "Ativação", isRun: true, suggestedDist: `2.0 km`, description: "15 min de trote muito leve + 3 acelerações de 80m para acordar as pernas.", effort: "Super leve", videoSearchTerm: "Shakeout run antes da prova" },
+            { 
+              dayOfWeek: `Domingo (${raceDayFormatted})`, sessionType: `🏆 DIA DA PROVA / TESTE ALVO (${cycleSpec.raceDistKm} km)`, zone: "RACE", zoneDesc: "Competição", isRun: true, isRaceDay: true, suggestedDist: `${cycleSpec.raceDistKm} km`, description: "Dia de colheita! Execute a estratégia de pace planejada, controle a ansiedade no primeiro quilômetro e entregue tudo na reta final.", effort: "Máximo Planejado", videoSearchTerm: "Estratégia de prova corrida",
+              steps: [
+                { label: "Pré-Largada", detail: "10-15 min trote leve + mobilidade dinâmica + 3 tiros curtos de 50m" },
+                { label: "Prova Principal", detail: `${cycleSpec.raceDistKm} km em ritmo alvo progressivo` },
+                { label: "Pós-Prova", detail: "Caminhada leve, hidratação e celebração do resultado!" }
+              ]
+            }
+          ];
+        }
         
         sessionsContainer.innerHTML = evaluatedSessions.map(s => {
-          const zoneClass = s.zone.toLowerCase();
+          const zoneClass = s.isRaceDay ? 'race-badge' : s.zone.toLowerCase();
+          const cardExtraClass = s.isRaceDay ? 'race-day-card' : '';
           let detailsHtml = '';
           if (s.isRun) {
-            const suggestedPace = getPaceRangeForZone(basePaceSecs, s.zone);
+            const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, s.zone);
             detailsHtml = `
               <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
               <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
@@ -521,8 +561,8 @@
           }
 
           return `
-            <div class="card">
-              <div class="day">${s.dayOfWeek}</div>
+            <div class="card ${cardExtraClass}">
+              <div class="day" style="${s.isRaceDay ? 'color: var(--accent-yellow);' : ''}">${s.dayOfWeek}</div>
               <div class="type">
                 <span>${s.sessionType}</span>
                 <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
@@ -579,7 +619,7 @@
       if (zoneUpper.includes('Z2') || zoneUpper.includes('QUEIMA DE GORDURA') || zoneUpper.includes('RESISTÊNCIA')) {
         return '6:50 - 7:35 /km';
       }
-      if (zoneUpper.includes('Z1') || zoneUpper.includes('REGENERATIVO') || zoneUpper.includes('MUITO LEVE')) {
+      if (zoneUpper.includes('Z1') || zoneUpper.includes('REGENERATIVO') || zoneUpper.includes('MUITO LEVE') || zoneUpper.includes('ATIVAÇÃO')) {
         return '7:40 - 8:30 /km';
       }
 
