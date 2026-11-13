@@ -197,7 +197,7 @@
 
     <div class="metrics-grid">
       <div class="metric-card">
-        <div class="metric-label">Rodado na Semana</div>
+        <div class="metric-label">Rodado na Semana (Seg-Dom)</div>
         <div class="metric-value highlight" id="m-week-km">0.0 km</div>
       </div>
       <div class="metric-card">
@@ -326,7 +326,6 @@
         return { name: `Semana ${weekNum}: Queima Calórica Progressiva`, factor: 1.05, isRaceWeek: false };
       }
 
-      // Última semana do ciclo = Polimento Final + Dia da Prova no encerramento
       if (weekNum === totalWeeks) {
         return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final & Dia da Prova 🏆`, factor: 0.65, isRaceWeek: true };
       }
@@ -334,7 +333,6 @@
         return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento (Redução de Carga)`, factor: 0.85, isRaceWeek: false };
       }
 
-      // Regra 3:1 -> A cada 4 semanas (Sem 4, Sem 8, Sem 12), aplica Deload regenerativo
       if (weekNum % 4 === 0) {
         return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.82, isRaceWeek: false };
       }
@@ -400,7 +398,8 @@
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         
-        const dayOfWeek = now.getDay();
+        // --- JANELA DA SEMANA ATUAL RIGOROSAMENTE DE SEGUNDA A DOMINGO ---
+        const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
         const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
         
         const startOfCurrentWeek = new Date(now);
@@ -446,11 +445,18 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        // --- CÁLCULO DA SEMANA DENTRO DO MACROCICLO E DATA DA PROVA ---
-        let cycleStartDate = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-10-04T00:00:00');
+        // --- CÁLCULO DA SEMANA DENTRO DO MACROCICLO COM INÍCIO NA SEGUNDA-FEIRA ---
+        let rawCycleStart = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-10-05T00:00:00');
+        rawCycleStart.setHours(0, 0, 0, 0);
+        
+        // Assegura que o ciclo comece em uma segunda-feira
+        const startDayOfWeek = rawCycleStart.getDay();
+        const cycleStartDiff = startDayOfWeek === 0 ? -6 : 1 - startDayOfWeek;
+        const cycleStartDate = new Date(rawCycleStart);
+        cycleStartDate.setDate(rawCycleStart.getDate() + cycleStartDiff);
         cycleStartDate.setHours(0, 0, 0, 0);
 
-        // Último dia do ciclo (Domingo da semana final) = Dia da Prova
+        // Domingo de encerramento da última semana = Dia da Prova
         const raceDayDate = new Date(cycleStartDate);
         raceDayDate.setDate(cycleStartDate.getDate() + (cycleSpec.totalWeeks * 7) - 1);
         const raceDayFormatted = raceDayDate.toLocaleDateString('pt-BR');
@@ -491,7 +497,7 @@
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
         const raceBannerHtml = cycleSpec.isRaceCycle 
-          ? `<span style="color: var(--accent-green); font-size: 11px; display: block; margin-top: 4px;">🏁 Data Alvo / Dia da Prova (Encerramento do Ciclo): <strong>${raceDayFormatted}</strong></span>` 
+          ? `<span style="color: var(--accent-green); font-size: 11px; display: block; margin-top: 4px;">🏁 Data Alvo / Dia da Prova (Domingo final): <strong>${raceDayFormatted}</strong></span>` 
           : '';
 
         const floorNotice = (!phaseInfo.isRaceWeek && previousWeekKm < protectedFloor)
@@ -503,7 +509,7 @@
         const sessionsContainer = document.getElementById('sessions-container');
         let evaluatedSessions = objectiveConfig.getSessions(dynamicTargetKm);
 
-        // --- MODULAÇÃO AUTOMÁTICA DA SEMANA DA PROVA (POLIMENTO + RACE DAY NO DOMINGO) ---
+        // --- MODULAÇÃO DA SEMANA DA PROVA (Segunda a Sábado de ativação e Domingo = Race Day) ---
         if (phaseInfo.isRaceWeek && cycleSpec.isRaceCycle) {
           evaluatedSessions = [
             { dayOfWeek: "Segunda-feira", sessionType: "Mobilidade Leve & Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: false, duration: "20 min", description: "Soltura articular suave sem fadiga muscular.", effort: "Muito leve", videoSearchTerm: "Mobilidade pré prova corrida" },

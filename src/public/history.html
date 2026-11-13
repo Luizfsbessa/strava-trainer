@@ -205,7 +205,7 @@
 
       if (!cycleHistory || cycleHistory.length === 0) {
         cycleHistory = [
-          { id: 'cycle-5k-active', goalName: "Concluir / Baixar Tempo nos 5 km", startDate: '2026-10-04', endDate: null }
+          { id: 'cycle-5k-active', goalName: "Concluir / Baixar Tempo nos 5 km", startDate: '2026-10-05', endDate: null }
         ];
       }
 
@@ -216,7 +216,14 @@
         const isCurrentlyActive = cycle.endDate === null;
         const spec = getCycleSpecification(cycleName);
         
-        let cycleStartDate = new Date(cycle.startDate || '2026-10-04T00:00:00');
+        let rawCycleStart = new Date(cycle.startDate || '2026-10-05T00:00:00');
+        rawCycleStart.setHours(0, 0, 0, 0);
+
+        // Força início do ciclo estritamente na segunda-feira
+        const startDayOfWeek = rawCycleStart.getDay();
+        const cycleStartDiff = startDayOfWeek === 0 ? -6 : 1 - startDayOfWeek;
+        let cycleStartDate = new Date(rawCycleStart);
+        cycleStartDate.setDate(rawCycleStart.getDate() + cycleStartDiff);
         cycleStartDate.setHours(0, 0, 0, 0);
 
         const raceDayDate = new Date(cycleStartDate);
@@ -237,7 +244,7 @@
           const totalWeeksToRender = Math.max(spec.totalWeeks, currentWeekNumber);
 
           const raceTagHeader = spec.isRaceCycle 
-            ? `<span style="font-size: 12px; color: #10b981; background: rgba(16,185,129,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); margin-right: 6px;">🏁 Prova: ${raceDayFormatted}</span>` 
+            ? `<span style="font-size: 12px; color: #10b981; background: rgba(16,185,129,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); margin-right: 6px;">🏁 Prova (Domingo): ${raceDayFormatted}</span>` 
             : '';
 
           activeHeaderBadge = `${raceTagHeader}<span style="font-size: 12px; color: var(--accent-blue); background: rgba(56,189,248,0.1); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3); margin-right: 6px;">Semana ${currentWeekNumber} de ${spec.totalWeeks}</span>`;
@@ -306,7 +313,7 @@
                 `;
               }).join('');
             } else if (isRaceWeek) {
-              workoutsListHtml = `<div style="font-size: 12px; color: var(--accent-gold); padding: 8px 0;">🏆 Dia da Prova / Teste Alvo programado para encerramento no domingo (<strong>${raceDayFormatted}</strong>).</div>`;
+              workoutsListHtml = `<div style="font-size: 12px; color: var(--accent-gold); padding: 8px 0;">🏆 Dia da Prova / Teste Alvo programado para encerramento neste domingo (<strong>${raceDayFormatted}</strong>).</div>`;
             } else {
               workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
             }
@@ -322,7 +329,7 @@
                   <div>
                     <strong style="color: var(--text-main);">${weekTitle}</strong>
                     <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                      Período: ${wStart.toLocaleDateString('pt-BR')} a ${wEnd.toLocaleDateString('pt-BR')} ${isRaceWeek ? `• <strong style="color: #10b981;">Dia da Prova: ${raceDayFormatted}</strong>` : '(Clique para expandir)'}
+                      Período (Seg a Dom): ${wStart.toLocaleDateString('pt-BR')} a ${wEnd.toLocaleDateString('pt-BR')} ${isRaceWeek ? `• <strong style="color: #10b981;">Prova no Domingo: ${raceDayFormatted}</strong>` : '(Clique para expandir)'}
                     </div>
                   </div>
                   <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
@@ -334,7 +341,7 @@
                 </div>
                 
                 <div id="details-week-${weekUid}" style="display: ${isCurrentWeek ? 'block' : 'none'}; margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
-                  <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas:</div>
+                  <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-bottom: 6px;">📋 Atividades Realizadas (Segunda a Domingo):</div>
                   ${workoutsListHtml}
                 </div>
               </div>
@@ -388,7 +395,7 @@
               <div>${badgeTag}</div>
             </div>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">
-              Periodização completa com proteção de volume mínimo, mesociclos regenerativos (3:1) e polimento final para o dia da prova.
+              Periodização de Segunda a Domingo, com proteção de volume mínimo, mesociclos regenerativos (3:1) e prova no domingo de encerramento.
             </p>
             <div>${weeksList.join('')}</div>
           </div>
@@ -558,6 +565,7 @@
 
       const firstDayOfMonth = new Date(year, month, 1);
       const lastDayOfMonth = new Date(year, month + 1, 0);
+      // Ordem dos dias no calendário iniciando na Segunda-feira
       const daysLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
       let html = daysLabels.map(d => `<div class="cal-day-name">${d}</div>`).join('');
 
