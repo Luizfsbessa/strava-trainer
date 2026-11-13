@@ -186,26 +186,10 @@
         ];
       }
 
-      // Filtra apenas o ciclo ativo principal e ciclos anteriores com nome diferente (evita duplicações de semanas)
-      const filteredCycles = [];
-      const seenGoals = new Set();
-
-      cycleHistory.forEach(cycle => {
-        const isCurrentlyActive = cycle.endDate === null;
-        if (isCurrentlyActive) {
-          filteredCycles.push(cycle);
-        } else if (!cycle.goalName.includes('Semana 1') && !cycle.goalName.includes('Semana 2')) {
-          if (!seenGoals.has(cycle.goalName)) {
-            seenGoals.add(cycle.goalName);
-            filteredCycles.push(cycle);
-          }
-        }
-      });
-
       const targetVolumeBase = 22.9;
       let fullCyclesHtml = '';
 
-      filteredCycles.forEach(cycle => {
+      cycleHistory.forEach(cycle => {
         const cycleName = cycle.goalName || cycle.title || "Ciclo de Treinamento";
         const isCurrentlyActive = cycle.endDate === null;
         
@@ -218,16 +202,21 @@
         let weeksList = [];
         
         if (isCurrentlyActive) {
-          // Renderiza a estrutura completa das 4 semanas no Card Ativo
-          const weekRanges = [
-            { weekNum: 1, start: new Date(2026, 9, 4), end: new Date(2026, 9, 11, 23, 59, 59) },   // 04/10 a 11/10
-            { weekNum: 2, start: new Date(2026, 9, 12), end: new Date(2026, 9, 18, 23, 59, 59) },  // 12/10 a 18/10
-            { weekNum: 3, start: new Date(2026, 9, 19), end: new Date(2026, 9, 25, 23, 59, 59) },  // 19/10 a 25/10 (ATUAL)
-            { weekNum: 4, start: new Date(2026, 9, 26), end: new Date(2026, 10, 1, 23, 59, 59) }   // 26/10 a 01/11
-          ];
+          // Calcula dinamicamente quantas semanas se passaram desde o início do ciclo até hoje
+          const diffTime = Math.max(0, today - cycleStartDate);
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const currentWeekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
 
-          weekRanges.forEach(wRange => {
-            const isCurrentWeek = today >= wRange.start && today <= wRange.end;
+          // Renderiza da semana atual até a semana 1 de forma decrescente
+          for (let wNum = currentWeekNumber; wNum >= 1; wNum--) {
+            const wStart = new Date(cycleStartDate);
+            wStart.setDate(cycleStartDate.getDate() + (wNum - 1) * 7);
+
+            const wEnd = new Date(wStart);
+            wEnd.setDate(wStart.getDate() + 6);
+            wEnd.setHours(23, 59, 59, 999);
+
+            const isCurrentWeek = today >= wStart && today <= wEnd;
 
             let kmDone = 0;
             let weekWorkouts = [];
@@ -239,7 +228,7 @@
                 const [yyyy, mm, dd] = dateStr.split('-').map(Number);
                 const wDate = new Date(yyyy, mm - 1, dd, 12, 0, 0);
 
-                if (wDate >= wRange.start && wDate <= wRange.end) {
+                if (wDate >= wStart && wDate <= wEnd) {
                   kmDone += Number(workout.distanceKm || workout.distance || 0);
                   weekWorkouts.push(workout);
                 }
@@ -247,12 +236,12 @@
             });
 
             let weekTitle = isCurrentWeek 
-              ? `Semana ${wRange.weekNum}: Bloco Ativo (Semana Atual)` 
-              : `Semana ${wRange.weekNum}: Registro de Treinos`;
+              ? `Semana ${wNum}: Bloco Ativo (Semana Atual)` 
+              : `Semana ${wNum}: Registro de Treinos`;
 
             const statusTag = isCurrentWeek
               ? `<span style="color: var(--accent-gold); font-weight: bold;">Em Andamento</span>`
-              : (weekWorkouts.length > 0 || today > wRange.end ? `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>` : `<span style="color: var(--text-muted);">Futuro</span>`);
+              : (weekWorkouts.length > 0 || today > wEnd ? `<span style="color: var(--accent-blue); font-weight: bold;">Concluído</span>` : `<span style="color: var(--text-muted);">Futuro</span>`);
 
             let workoutsListHtml = '';
             if (weekWorkouts.length > 0) {
@@ -279,7 +268,7 @@
               workoutsListHtml = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">Nenhum treino registrado nesta semana.</div>`;
             }
 
-            const weekUid = `active-w${wRange.weekNum}`;
+            const weekUid = `active-w${wNum}`;
 
             const weekHtmlBlock = `
               <div class="week-item" style="margin-bottom: 12px; cursor: pointer;" onclick="toggleWeekDetails('${weekUid}')">
@@ -287,7 +276,7 @@
                   <div>
                     <strong style="color: var(--text-main);">${weekTitle}</strong>
                     <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                      Período: ${wRange.start.toLocaleDateString('pt-BR')} a ${wRange.end.toLocaleDateString('pt-BR')} (Clique para expandir)
+                      Período: ${wStart.toLocaleDateString('pt-BR')} a ${wEnd.toLocaleDateString('pt-BR')} (Clique para expandir)
                     </div>
                   </div>
                   <div style="display: flex; gap: 20px; font-size: 13px; align-items: center;">
@@ -305,11 +294,10 @@
               </div>
             `;
 
-            // Mantém a semana 4 e 3 no topo e as anteriores abaixo
-            weeksList.unshift(weekHtmlBlock);
-          });
+            weeksList.push(weekHtmlBlock);
+          }
         } else {
-          // Renderização do histórico anterior (ex: Perda de Peso Progressiva)
+          // Ciclos encerrados (ex: Perda de Peso)
           const cycleEndDate = new Date(cycle.endDate);
           let totalKmInCycle = 0;
 
