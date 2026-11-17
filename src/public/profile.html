@@ -86,7 +86,7 @@
             <option value="hipertrofia">Ganho de Massa Muscular / Hipertrofia</option>
           </select>
         </div>
-        <button type="submit" class="btn">Salvar Alterações e Atualizar Algoritmo</button>
+        <button type="submit" class="btn">Salvar Alterações de Perfil</button>
       </form>
     </div>
 
@@ -135,7 +135,7 @@
       return age;
     }
 
-    function updateZonesTable(age, basePaceSeconds = 442) { // 442s = 7:22/km
+    function updateZonesTable(age, basePaceSeconds = 442) {
       const fcMax = 220 - age;
       document.getElementById('fcmax-subtitle').innerText = `Baseado na sua idade (${age} anos) • FCMax estimada: ${fcMax} bpm (Fórmula: 220 - idade)`;
 
@@ -285,51 +285,47 @@
     }
 
     async function loadProfile() {
-    let basePaceSec = 442;
+      let basePaceSec = 442;
 
-    try {
-      const res = await fetch('/api/user/profile');
-      if (res.ok) {
-        const apiData = await res.json();
-        if (apiData.profile) {
-          // 1. Peso Atual
-          document.getElementById('pWeight').value = apiData.profile.weightKg || 99.3;
+      try {
+        const res = await fetch('/api/user/profile');
+        if (res.ok) {
+          const apiData = await res.json();
+          if (apiData.profile) {
+            document.getElementById('pWeight').value = apiData.profile.weightKg || 99.3;
 
-          // 2. Peso Meta (com W maiúsculo)
-          if (apiData.profile.targetWeight) {
-            document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
-          }
+            if (apiData.profile.targetWeight) {
+              document.getElementById('pTargetWeight').value = apiData.profile.targetWeight;
+            }
 
-          // 3. Data de Nascimento
-          if (apiData.profile.birthDate) {
-            document.getElementById('pBirthDate').value = apiData.profile.birthDate.split('T')[0];
-          } else if (apiData.profile.age) {
-            const currentYear = new Date().getFullYear();
-            const estimatedYear = currentYear - apiData.profile.age;
-            document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
-          }
+            if (apiData.profile.birthDate) {
+              document.getElementById('pBirthDate').value = apiData.profile.birthDate.split('T')[0];
+            } else if (apiData.profile.age) {
+              const currentYear = new Date().getFullYear();
+              const estimatedYear = currentYear - apiData.profile.age;
+              document.getElementById('pBirthDate').value = `${estimatedYear}-01-01`;
+            }
 
-          // 4. Seleciona o Objetivo ativo vindo do banco
-          if (apiData.profile.activeGoalName) {
-            const objectiveSelect = document.getElementById('pObjective');
-            for (let i = 0; i < objectiveSelect.options.length; i++) {
-              if (objectiveSelect.options[i].text === apiData.profile.activeGoalName) {
-                objectiveSelect.selectedIndex = i;
-                break;
+            if (apiData.profile.activeGoalName) {
+              const objectiveSelect = document.getElementById('pObjective');
+              for (let i = 0; i < objectiveSelect.options.length; i++) {
+                if (objectiveSelect.options[i].text === apiData.profile.activeGoalName) {
+                  objectiveSelect.selectedIndex = i;
+                  break;
+                }
               }
             }
+
+            const currentAge = calculateAge(document.getElementById('pBirthDate').value);
+            updateZonesTable(currentAge, basePaceSec);
           }
-
-          const currentAge = calculateAge(document.getElementById('pBirthDate').value);
-          updateZonesTable(currentAge, basePaceSec);
         }
+      } catch (e) {
+        console.log('Sem conexão com API local ou erro ao carregar perfil:', e);
       }
-    } catch (e) {
-      console.log('Sem conexão com API local ou erro ao carregar perfil:', e);
-    }
 
-    await loadWeightChart();
-  }
+      await loadWeightChart();
+    }
 
     async function saveProfile(event) {
       event.preventDefault();
@@ -338,11 +334,10 @@
       const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
       const objectiveSelect = document.getElementById('pObjective');
       const objectiveVal = objectiveSelect.value;
-      const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
       const ageVal = calculateAge(birthDateVal);
 
       try {
-        // 1. Atualiza Perfil Antropométrico completo enviando altura e género fixos/padrão para passar na validação
+        // Atualiza apenas os dados de perfil antropométrico e objetivo visual, SEM criar novos ciclos na tabela UserCycle
         const profileRes = await fetch('/api/user/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -352,7 +347,7 @@
             gender: 'MALE',
             weightKg: isNaN(weightVal) ? 99.3 : weightVal,
             targetWeight: isNaN(targetWeightVal) ? null : targetWeightVal,
-            heightCm: 180, // Obrigatório para o backend não dar erro 400
+            heightCm: 180,
             goal: objectiveVal === 'perda_peso' ? 'WEIGHT_LOSS' : 'MAINTENANCE'
           })
         });
@@ -362,16 +357,7 @@
           throw new Error(errData.error || 'Erro ao salvar perfil no servidor.');
         }
 
-        // 2. Transição do Ciclo diretamente no Banco Neon/PostgreSQL via Prisma
-        const cycleRes = await fetch('/api/user/cycles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goalName: objectiveText })
-        });
-
-        if (!cycleRes.ok) throw new Error('Erro ao salvar ciclo de treino.');
-
-        alert('Perfil, peso meta e objetivos salvos no Banco de Dados com sucesso!');
+        alert('Perfil e peso atualizados com sucesso, preservando o seu ciclo atual!');
       } catch (e) {
         console.error('Erro ao salvar dados:', e);
         alert('Erro ao salvar no banco de dados: ' + e.message);
