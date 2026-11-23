@@ -384,15 +384,20 @@
       if (!sessionsContainer) return;
 
       sessionsContainer.innerHTML = sessions.map(s => {
-        const zoneClass = s.isRaceDay ? 'race-badge' : String(s.zone || 'z1').toLowerCase();
+        const zone = s.zone || 'Z2';
+        const zoneDesc = s.zoneDesc || 'Resistência';
+        const desc = s.description || 'Rodagem contínua em ritmo controlado.';
+        const effort = s.effort || 'Constante';
+        const zoneClass = s.isRaceDay ? 'race-badge' : String(zone).toLowerCase();
         const cardExtraClass = s.isRaceDay ? 'race-day-card' : '';
+
         let detailsHtml = '';
         if (s.isRun) {
-          const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, s.zone);
+          const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, zone);
           detailsHtml = `
             <span>Volume Proposto: <strong>${s.suggestedDist}</strong></span>
             <span>Pace Alvo: <strong>${suggestedPace}</strong></span>
-            <span>Esforço: <strong>${s.effort}</strong></span>
+            <span>Esforço: <strong>${effort}</strong></span>
           `;
         }
 
@@ -418,9 +423,9 @@
             <div class="day" style="${s.isRaceDay ? 'color: var(--accent-yellow);' : ''}">${s.dayOfWeek}</div>
             <div class="type">
               <span>${s.sessionType}</span>
-              <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
+              <span class="zone-badge ${zoneClass}">${zone} - ${zoneDesc}</span>
             </div>
-            <div class="desc">${s.description}</div>
+            <div class="desc">${desc}</div>
             ${s.isRun ? `<div class="workout-details">${detailsHtml}</div>` : ''}
             ${structuredHtml}
             ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">YouTube: ${s.videoSearchTerm}</a>` : ''}
@@ -666,15 +671,15 @@
         },
         {
           dayOfWeek: "Terça-feira",
-          sessionType: config.tueTitle,
-          zone: config.tueZone,
-          zoneDesc: config.tueZoneDesc,
+          sessionType: config.tueTitle || "Intervalado",
+          zone: config.tueZone || "Z4",
+          zoneDesc: config.tueZoneDesc || "Limiar",
           isRun: true,
           rawKm: q1,
           suggestedDist: formatSessionVolume(q1),
-          description: config.tueDesc,
-          effort: config.tueEffort,
-          videoSearchTerm: config.tueVideo,
+          description: config.tueDesc || "Sessão intervalada para estímulo de ritmo.",
+          effort: config.tueEffort || "Forte controlado",
+          videoSearchTerm: config.tueVideo || "",
           steps: [
             { label: "Aquecimento", detail: "1.0 km trote leve" },
             { label: "Bloco Principal", detail: `${reps}x 600m forte / 200m trote` },
@@ -695,15 +700,15 @@
         },
         {
           dayOfWeek: "Quinta-feira",
-          sessionType: config.thuTitle,
-          zone: config.thuZone,
-          zoneDesc: config.thuZoneDesc,
+          sessionType: config.thuTitle || "Ritmo Contínuo (Z2/Z3)",
+          zone: config.thuZone || "Z2",
+          zoneDesc: config.thuZoneDesc || "Resistência",
           isRun: true,
           rawKm: q2,
           suggestedDist: formatSessionVolume(q2),
-          description: config.thuDesc,
-          effort: config.thuEffort,
-          videoSearchTerm: config.thuVideo,
+          description: config.thuDesc || "Rodagem aeróbica sustentada.",
+          effort: config.thuEffort || "Constante",
+          videoSearchTerm: config.thuVideo || "",
           steps: [
             { label: "Aquecimento", detail: "1.0 km trote leve" },
             { label: "Bloco Contínuo", detail: `${mainPace} km em ritmo sustentado` },
@@ -732,7 +737,7 @@
           suggestedDist: formatSessionVolume(longK),
           description: "Maior quilometragem da semana para construir resistência.",
           effort: "Constante",
-          videoSearchTerm: config.satVideo
+          videoSearchTerm: config.satVideo || ""
         },
         {
           dayOfWeek: "Domingo",
@@ -795,8 +800,18 @@
       return {
         text: "Perda de Peso Progressiva (Ciclos 4 Sem.)",
         getSessions: (target) => buildSixDaySessions(target, {
-          tueTitle: "Intervalado Moderado", tueZone: "Z3", tueZoneDesc: "Moderado", tueDesc: "Estímulo intervalado para gasto calórico.", tueEffort: "Moderado", tueVideo: "Treino intervalado para emagrecer",
-          thuTitle: "Ritmo Contínuo (Z2/Z3)", tueZone: "Z2", tueZoneDesc: "Resistência", tueDesc: "Rodagem aeróbica sustentada.", tueEffort: "Constante", tueVideo: "Ritmo de prova 10km",
+          tueTitle: "Intervalado Moderado",
+          tueZone: "Z3",
+          tueZoneDesc: "Moderado",
+          tueDesc: "Estímulo intervalado para gasto calórico.",
+          tueEffort: "Moderado",
+          tueVideo: "Treino intervalado para emagrecer",
+          thuTitle: "Ritmo Contínuo (Z2/Z3)",
+          thuZone: "Z2",
+          thuZoneDesc: "Resistência",
+          thuDesc: "Rodagem aeróbica sustentada.",
+          thuEffort: "Constante",
+          thuVideo: "Ritmo de prova 10km",
           satVideo: "Treino longo para perda de peso"
         })
       };
@@ -828,7 +843,7 @@
           body: JSON.stringify(newWorkout)
         });
 
-        if (!response.ok) throw new Error('Erro ao salvar na base de dados');
+        if (!response.ok) throw new Error('Erro ao salvar no banco de dados');
 
         document.getElementById('workout-form').reset();
         document.getElementById('activityDate').valueAsDate = new Date();
