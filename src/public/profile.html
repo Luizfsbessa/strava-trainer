@@ -22,13 +22,16 @@
       padding: 30px 20px; 
       box-sizing: border-box; 
     }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px; }
     h1 { color: var(--accent-blue); font-size: 28px; margin: 0 0 5px 0; font-weight: 800; }
-    .nav-links { display: flex; gap: 12px; }
+    .nav-links { display: flex; gap: 12px; flex-wrap: wrap; }
     .nav-links a { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
     .nav-links a:hover { border-color: var(--accent-blue); }
     
     .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .section-block { margin-bottom: 24px; }
+    .section-block:last-child { margin-bottom: 0; }
+    .section-divider { border: 0; border-top: 1px solid var(--border-color); margin: 24px 0; }
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
     input, select { width: 100%; padding: 12px; background: #070a12; border: 1px solid var(--border-color); color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
@@ -36,6 +39,8 @@
     .age-preview { font-size: 12px; color: var(--accent-blue); margin-top: 5px; font-weight: 600; }
     .btn { background: var(--accent-green); color: white; border: none; padding: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; font-size: 15px; transition: background 0.2s; }
     .btn:hover { background: #059669; }
+    .btn-cycle { background: var(--accent-blue); color: #060911; }
+    .btn-cycle:hover { background: #0284c7; color: #ffffff; }
 
     .zones-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
     .zones-table th, .zones-table td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
@@ -48,7 +53,7 @@
     <header>
       <div>
         <h1>Configuração de Perfil</h1>
-        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, objetivos e zonas de esforço.</div>
+        <div style="color: var(--text-muted); font-size: 14px;">Gerencie seus dados, ciclos e zonas de esforço.</div>
       </div>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
@@ -59,7 +64,7 @@
     </header>
 
     <div class="card">
-      <form id="profile-form" onsubmit="saveProfile(event)">
+      <form id="profile-form" class="section-block" onsubmit="saveWeightAndProfile(event)">
         <div class="form-group">
           <label>Data de Nascimento</label>
           <input type="date" id="pBirthDate" required onchange="onBirthDateChange()">
@@ -73,8 +78,14 @@
           <label>Peso Meta / Alvo (kg)</label>
           <input type="number" step="0.1" id="pTargetWeight" required placeholder="Ex: 88.0">
         </div>
+        <button type="submit" class="btn">Salvar Peso e Dados do Perfil</button>
+      </form>
+
+      <hr class="section-divider">
+
+      <form id="cycle-form" class="section-block" onsubmit="startNewCycle(event)">
         <div class="form-group">
-          <label>🎯 Objetivo Principal de Treinamento</label>
+          <label>Objetivo do Ciclo de Treinamento</label>
           <select id="pObjective">
             <option value="perda_peso">Perda de Peso Progressiva (Foco em Déficit e Composição)</option>
             <option value="5km">Concluir / Baixar Tempo nos 5 km</option>
@@ -86,23 +97,23 @@
             <option value="hipertrofia">Ganho de Massa Muscular / Hipertrofia</option>
           </select>
         </div>
-        <button type="submit" class="btn">Salvar Alterações de Perfil</button>
+        <button type="submit" class="btn btn-cycle">Iniciar Novo Ciclo</button>
       </form>
     </div>
 
     <!-- Gráfico de Evolução de Peso -->
     <div class="card">
-      <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">📉 Evolução do Peso Corporal</div>
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">Evolução do Peso Corporal</div>
       <div id="chartContainer" style="max-height: 280px; position: relative;">
         <canvas id="weightChart"></canvas>
       </div>
       <div id="noDataMsg" style="display: none; color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 14px;">
-        Nenhum registro de peso encontrado. Clique em "Salvar Alterações" acima para registrar seu peso no histórico.
+        Nenhum registro de peso encontrado. Clique em "Salvar Peso e Dados do Perfil" acima para registrar seu peso no histórico.
       </div>
     </div>
 
     <div class="card">
-      <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">⚡ Suas Zonas de Frequência Cardíaca e Ritmo Estimado</div>
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">Suas Zonas de Frequência Cardíaca e Ritmo Estimado</div>
       <div id="fcmax-subtitle" style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Calculando com base na data de nascimento...</div>
       <table class="zones-table">
         <thead>
@@ -308,8 +319,19 @@
 
             if (apiData.profile.activeGoalName) {
               const objectiveSelect = document.getElementById('pObjective');
+              const activeGoalLower = String(apiData.profile.activeGoalName).toLowerCase();
               for (let i = 0; i < objectiveSelect.options.length; i++) {
-                if (objectiveSelect.options[i].text === apiData.profile.activeGoalName) {
+                const optTextLower = objectiveSelect.options[i].text.toLowerCase();
+                const optValLower = objectiveSelect.options[i].value.toLowerCase();
+                if (
+                  optTextLower === activeGoalLower ||
+                  activeGoalLower.includes(optValLower) ||
+                  (activeGoalLower.includes('perda de peso') && optValLower === 'perda_peso') ||
+                  (activeGoalLower.includes('5 km') && optValLower === '5km') ||
+                  (activeGoalLower.includes('10 km') && optValLower === '10km') ||
+                  (activeGoalLower.includes('21') && optValLower === 'meia_maratona') ||
+                  (activeGoalLower.includes('42') && optValLower === 'maratona')
+                ) {
                   objectiveSelect.selectedIndex = i;
                   break;
                 }
@@ -317,6 +339,7 @@
             }
 
             const currentAge = calculateAge(document.getElementById('pBirthDate').value);
+            document.getElementById('agePreviewText').innerText = `Idade calculada automaticamente: ${currentAge} anos`;
             updateZonesTable(currentAge, basePaceSec);
           }
         }
@@ -327,17 +350,15 @@
       await loadWeightChart();
     }
 
-    async function saveProfile(event) {
+    async function saveWeightAndProfile(event) {
       event.preventDefault();
       const birthDateVal = document.getElementById('pBirthDate').value;
       const weightVal = parseFloat(document.getElementById('pWeight').value);
       const targetWeightVal = parseFloat(document.getElementById('pTargetWeight').value);
-      const objectiveSelect = document.getElementById('pObjective');
-      const objectiveVal = objectiveSelect.value;
+      const objectiveVal = document.getElementById('pObjective').value;
       const ageVal = calculateAge(birthDateVal);
 
       try {
-        // Atualiza apenas os dados de perfil antropométrico e objetivo visual, SEM criar novos ciclos na tabela UserCycle
         const profileRes = await fetch('/api/user/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -353,17 +374,48 @@
         });
 
         if (!profileRes.ok) {
-          const errData = await profileRes.json();
+          const errData = await profileRes.json().catch(() => ({}));
           throw new Error(errData.error || 'Erro ao salvar perfil no servidor.');
         }
 
-        alert('Perfil e peso atualizados com sucesso, preservando o seu ciclo atual!');
+        alert('Peso e dados do perfil salvos com sucesso!');
       } catch (e) {
         console.error('Erro ao salvar dados:', e);
         alert('Erro ao salvar no banco de dados: ' + e.message);
       }
 
       await loadWeightChart();
+    }
+
+    async function startNewCycle(event) {
+      event.preventDefault();
+      const objectiveSelect = document.getElementById('pObjective');
+      const objectiveText = objectiveSelect.options[objectiveSelect.selectedIndex].text;
+      const objectiveVal = objectiveSelect.value;
+
+      const confirmed = confirm(`Deseja encerrar o ciclo atual e iniciar um novo ciclo com:\n"${objectiveText}"?`);
+      if (!confirmed) return;
+
+      try {
+        const cycleRes = await fetch('/api/user/cycles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            goalName: objectiveText,
+            goalKey: objectiveVal
+          })
+        });
+
+        if (!cycleRes.ok) {
+          const errData = await cycleRes.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao iniciar novo ciclo.');
+        }
+
+        alert(`Novo ciclo iniciado: ${objectiveText}`);
+      } catch (e) {
+        console.error('Erro ao iniciar novo ciclo:', e);
+        alert('Erro ao iniciar novo ciclo: ' + e.message);
+      }
     }
 
     document.addEventListener('DOMContentLoaded', loadProfile);
