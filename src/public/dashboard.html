@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -183,7 +183,7 @@
     <header>
       <div>
         <h1>Strava Trainer - Foco em Corrida</h1>
-        <div class="subtitle" id="subtitle-info">Carregando perfil de corrida...</div>
+        <div class="subtitle" id="subtitle-info">A carregar perfil de corrida...</div>
       </div>
       <div class="nav-links">
         <a href="dashboard.html" class="active">Dashboard</a>
@@ -294,11 +294,11 @@
     document.getElementById('activityDate').valueAsDate = new Date();
 
     const LOOP_KM = 1.5;
-    const EASY_RUN_KM = 4.5;     // 3 voltas de 1,5 km
-    const QUALITY_MIN_KM = 5.0;  // Faixa de qualidade: 5,0 km a 6,0 km
+    const EASY_RUN_KM = 4.5;
+    const QUALITY_MIN_KM = 5.0;
     const QUALITY_MAX_KM = 6.0;
     const LONG_RUN_MAX_KM = 10.0;
-    const BASE_WEEKLY_KM = (3 * EASY_RUN_KM) + (2 * QUALITY_MIN_KM) + 9.0; // 32.5 km
+    const BASE_WEEKLY_KM = (3 * EASY_RUN_KM) + (2 * QUALITY_MIN_KM) + 9.0;
 
     function roundToHalfKm(km) {
       return Math.round(km * 2) / 2;
@@ -306,6 +306,27 @@
 
     function clamp(val, min, max) {
       return Math.max(min, Math.min(max, val));
+    }
+
+    function parseLocalDate(rawDate) {
+      if (!rawDate) return null;
+      if (rawDate instanceof Date && !isNaN(rawDate)) {
+        const d = new Date(rawDate.getFullYear(), rawDate.getMonth(), rawDate.getDate());
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      const str = String(rawDate);
+      const datePart = str.includes('T') ? str.split('T')[0] : str.split(' ')[0];
+      const parts = datePart.split('-').map(Number);
+      if (parts.length === 3 && !parts.some(isNaN)) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      const parsed = new Date(str);
+      if (isNaN(parsed)) return null;
+      parsed.setHours(0, 0, 0, 0);
+      return parsed;
     }
 
     function formatSessionVolume(rawKm) {
@@ -358,7 +379,60 @@
       return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.06, isRaceWeek: false };
     }
 
+    function renderSessionsList(sessions, basePaceSecs) {
+      const sessionsContainer = document.getElementById('sessions-container');
+      if (!sessionsContainer) return;
+
+      sessionsContainer.innerHTML = sessions.map(s => {
+        const zoneClass = s.isRaceDay ? 'race-badge' : String(s.zone || 'z1').toLowerCase();
+        const cardExtraClass = s.isRaceDay ? 'race-day-card' : '';
+        let detailsHtml = '';
+        if (s.isRun) {
+          const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, s.zone);
+          detailsHtml = `
+            <span>Volume Proposto: <strong>${s.suggestedDist}</strong></span>
+            <span>Pace Alvo: <strong>${suggestedPace}</strong></span>
+            <span>Esforço: <strong>${s.effort}</strong></span>
+          `;
+        }
+
+        let structuredHtml = '';
+        if (s.steps && s.steps.length > 0) {
+          const stepsRows = s.steps.map(step => `
+            <div class="workout-step-item">
+              <span class="step-name">${step.label}</span>
+              <span class="step-detail">${step.detail}</span>
+            </div>
+          `).join('');
+
+          structuredHtml = `
+            <div class="structured-blocks">
+              <div class="structured-blocks-title">Estruturação do Treino de Corrida</div>
+              ${stepsRows}
+            </div>
+          `;
+        }
+
+        return `
+          <div class="card ${cardExtraClass}">
+            <div class="day" style="${s.isRaceDay ? 'color: var(--accent-yellow);' : ''}">${s.dayOfWeek}</div>
+            <div class="type">
+              <span>${s.sessionType}</span>
+              <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
+            </div>
+            <div class="desc">${s.description}</div>
+            ${s.isRun ? `<div class="workout-details">${detailsHtml}</div>` : ''}
+            ${structuredHtml}
+            ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">YouTube: ${s.videoSearchTerm}</a>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
     async function loadDashboard() {
+      let basePaceSecs = 420;
+      const fallbackConfig = getObjectiveMatrix("Perda de Peso Progressiva");
+
       try {
         const response = await fetch('/api/workouts');
         if (!response.ok) throw new Error('Erro ao carregar dados do servidor');
@@ -382,7 +456,7 @@
           const cyclesRes = await fetch('/api/user/cycles');
           if (cyclesRes.ok) {
             const cyclesList = await cyclesRes.json();
-            if (cyclesList && cyclesList.length > 0) {
+            if (Array.isArray(cyclesList) && cyclesList.length > 0) {
               activeCycle = cyclesList.find(c => c.endDate === null) || cyclesList[0];
             }
           }
@@ -390,14 +464,14 @@
           console.warn('Erro ao buscar ciclo ativo do banco:', e);
         }
 
-        const currentWeightNum = parseFloat(String(rawProfile.weightKg || rawProfile.weight || 98.4).replace(',', '.'));
+        const currentWeightNum = parseFloat(String(rawProfile.weightKg || rawProfile.weight || 97.0).replace(',', '.'));
         const targetWeightNum = parseFloat(String(rawProfile.targetWeight || 90.0).replace(',', '.'));
-        const savedObjective = (activeCycle && activeCycle.goalName) ? activeCycle.goalName : (rawProfile.goal || "5km");
+        const savedObjective = (activeCycle && activeCycle.goalName) ? activeCycle.goalName : (rawProfile.goal || "Perda de Peso Progressiva");
 
         const profile = {
           age: rawProfile.age || 39,
-          currentWeight: currentWeightNum,
-          targetWeight: targetWeightNum,
+          currentWeight: isNaN(currentWeightNum) ? 97.0 : currentWeightNum,
+          targetWeight: isNaN(targetWeightNum) ? 90.0 : targetWeightNum,
           objective: savedObjective
         };
 
@@ -423,13 +497,8 @@
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
             const isRun = (wType === 'corrida' || wType === 'run');
-            const wDateStr = w.activityDate || w.date;
-            if (!wDateStr) return false;
-            
-            const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
-            const wDate = new Date(year, month - 1, day);
-            wDate.setHours(0, 0, 0, 0);
-
+            const wDate = parseLocalDate(w.activityDate || w.date);
+            if (!wDate) return false;
             return isRun && wDate >= startOfCurrentWeek && wDate <= endOfCurrentWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
@@ -443,20 +512,15 @@
           .filter(w => {
             const wType = String(w.type || 'corrida').toLowerCase();
             const isRun = (wType === 'corrida' || wType === 'run');
-            const wDateStr = w.activityDate || w.date;
-            if (!wDateStr) return false;
-
-            const [year, month, day] = wDateStr.split('T')[0].split('-').map(Number);
-            const wDate = new Date(year, month - 1, day);
-            wDate.setHours(0, 0, 0, 0);
-
+            const wDate = parseLocalDate(w.activityDate || w.date);
+            if (!wDate) return false;
             return isRun && wDate >= startOfPreviousWeek && wDate <= endOfPreviousWeek;
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        let rawCycleStart = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-11-23T12:00:00');
-        rawCycleStart.setHours(0, 0, 0, 0);
-        
+        let rawCycleStart = parseLocalDate((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-11-23');
+        if (!rawCycleStart) rawCycleStart = new Date(startOfCurrentWeek);
+
         const startDayOfWeek = rawCycleStart.getDay();
         const cycleStartDiff = startDayOfWeek === 0 ? -6 : 1 - startDayOfWeek;
         const cycleStartDate = new Date(rawCycleStart);
@@ -478,7 +542,7 @@
         const effectiveBaseKm = Math.max(previousWeekKm, protectedFloor);
         const baseTargetKm = roundToHalfKm(effectiveBaseKm * phaseInfo.factor);
 
-        const basePaceSecs = calculateBasePace(workouts);
+        basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
         let projectionText = "Meta Atingida!";
@@ -488,7 +552,6 @@
           projectionText = `Faltam ${weightDiff.toFixed(1)}kg (~${estimatedWeeks} semanas)`;
         }
 
-        const sessionsContainer = document.getElementById('sessions-container');
         let evaluatedSessions = objectiveConfig.getSessions(baseTargetKm);
 
         if (phaseInfo.isRaceWeek && cycleSpec.isRaceCycle) {
@@ -530,58 +593,16 @@
           ? `${phaseInfo.name} • Prova: ${raceDayFormatted}`
           : phaseInfo.name;
         document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
-        
-        sessionsContainer.innerHTML = evaluatedSessions.map(s => {
-          const zoneClass = s.isRaceDay ? 'race-badge' : s.zone.toLowerCase();
-          const cardExtraClass = s.isRaceDay ? 'race-day-card' : '';
-          let detailsHtml = '';
-          if (s.isRun) {
-            const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, s.zone);
-            detailsHtml = `
-              <span>Volume Proposto: <strong>${s.suggestedDist}</strong></span>
-              <span>Pace Alvo: <strong>${suggestedPace}</strong></span>
-              <span>Esforço: <strong>${s.effort}</strong></span>
-            `;
-          }
 
-          let structuredHtml = '';
-          if (s.steps && s.steps.length > 0) {
-            const stepsRows = s.steps.map(step => `
-              <div class="workout-step-item">
-                <span class="step-name">${step.label}</span>
-                <span class="step-detail">${step.detail}</span>
-              </div>
-            `).join('');
-
-            structuredHtml = `
-              <div class="structured-blocks">
-                <div class="structured-blocks-title">Estruturação do Treino de Corrida</div>
-                ${stepsRows}
-              </div>
-            `;
-          }
-
-          return `
-            <div class="card ${cardExtraClass}">
-              <div class="day" style="${s.isRaceDay ? 'color: var(--accent-yellow);' : ''}">${s.dayOfWeek}</div>
-              <div class="type">
-                <span>${s.sessionType}</span>
-                <span class="zone-badge ${zoneClass}">${s.zone} - ${s.zoneDesc}</span>
-              </div>
-              <div class="desc">${s.description}</div>
-              ${s.isRun ? `<div class="workout-details">${detailsHtml}</div>` : ''}
-              ${structuredHtml}
-              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">YouTube: ${s.videoSearchTerm}</a>` : ''}
-            </div>
-          `;
-        }).join('');
-
+        renderSessionsList(evaluatedSessions, basePaceSecs);
       } catch (err) {
         console.error('Erro ao carregar dashboard de corrida:', err);
+        renderSessionsList(fallbackConfig.getSessions(BASE_WEEKLY_KM), basePaceSecs);
       }
     }
 
     function calculateBasePace(workouts) {
+      if (!Array.isArray(workouts)) return 420;
       const runs = workouts.filter(w => {
         const wType = String(w.type || 'corrida').toLowerCase();
         return (wType === 'corrida' || wType === 'run') && (parseFloat(w.distanceKm || w.distance) || 0) > 0 && (parseFloat(w.durationMinutes || w.duration) || 0) > 0;
@@ -613,12 +634,11 @@
       return `${formatPace(baseSecs * 0.95)} - ${formatPace(baseSecs * 1.05)} /km`;
     }
 
-    // Rodagens leves em 4,5 km (3 voltas), qualidade entre 5,0 e 6,0 km e longo de sábado até 10,0 km
     function buildSixDaySessions(targetKm, config) {
       const r1 = EASY_RUN_KM;
       const r2 = EASY_RUN_KM;
       const r3 = EASY_RUN_KM;
-      const easyTotal = r1 + r2 + r3; // 13,5 km
+      const easyTotal = r1 + r2 + r3;
 
       const extraVolume = Math.max(0, roundToHalfKm(targetKm) - BASE_WEEKLY_KM);
 
@@ -767,7 +787,7 @@
           text: "Meta: 10 km (Resistência - 10 Semanas)",
           getSessions: (target) => buildSixDaySessions(target, {
             tueTitle: "Intervalado Médio", tueZone: "Z4", tueZoneDesc: "Limiar", tueDesc: "Séries para sustentação de limiar.", tueEffort: "Forte sustentado", tueVideo: "Treino intervalado 10km",
-            thuTitle: "Ritmo Específico 10k", tueZone: "Z3", thuZoneDesc: "Ritmo Alvo", tueDesc: "Bloco no ritmo planejado para 10 km.", tueEffort: "Constante", tueVideo: "Ritmo de prova 10km",
+            thuTitle: "Ritmo Específico 10k", tueZone: "Z3", tueZoneDesc: "Ritmo Alvo", thuDesc: "Bloco no ritmo planejado para 10 km.", tueEffort: "Constante", tueVideo: "Ritmo de prova 10km",
             satVideo: "Treino longo 10km"
           })
         };
@@ -808,7 +828,7 @@
           body: JSON.stringify(newWorkout)
         });
 
-        if (!response.ok) throw new Error('Erro ao salvar no banco de dados');
+        if (!response.ok) throw new Error('Erro ao salvar na base de dados');
 
         document.getElementById('workout-form').reset();
         document.getElementById('activityDate').valueAsDate = new Date();
