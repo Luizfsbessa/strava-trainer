@@ -176,8 +176,6 @@
     .btn-strava:hover { background: #e04400; }
     
     .divider { border: 0; border-top: 1px solid var(--border-color); margin: 20px 0; }
-    
-    .rationale-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -201,7 +199,7 @@
         <div class="metric-value highlight" id="m-week-km">0.0 km</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Volume Alvo (Protegido)</div>
+        <div class="metric-label">Volume Alvo</div>
         <div class="metric-value" id="m-target-km">0.0 km</div>
         <div id="m-cycle-phase" style="font-size: 12px; color: var(--accent-yellow); margin-top: 6px; font-weight: 700;">-</div>
       </div>
@@ -215,7 +213,6 @@
       </div>
     </div>
 
-    <!-- BANNER DE GAMIFICAÇÃO / NÍVEL DE ATLETA -->
     <div class="card" style="margin-bottom: 20px; background: #0f172a; border: 1px solid #1e293b; padding: 16px 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -237,16 +234,13 @@
 
     <div class="main-layout">
       <div>
-        <div class="section-title">📅 Matriz de Corrida (6 Dias Ativos: Seg-Sáb | Descanso: Domingo)</div>
-        <div class="rationale-box" id="rationale-box">
-          Carregando diretrizes do motor de corrida...
-        </div>
+        <div class="section-title">Treinos da Semana (Seg-Sáb • Circuito 1,5 km/volta)</div>
         <div id="sessions-container"></div>
       </div>
 
       <div>
         <div class="sidebar-panel">
-          <div class="section-title" style="font-size: 14px;">⚡ Importar do Strava (GPX)</div>
+          <div class="section-title" style="font-size: 14px;">Importar do Strava (GPX)</div>
           <form id="gpx-form" onsubmit="uploadGpx(event)">
             <div class="form-group">
               <input type="file" id="gpxFiles" accept=".gpx" multiple required style="padding: 8px; font-size: 11px; cursor: pointer;">
@@ -256,27 +250,27 @@
 
           <hr class="divider">
 
-          <div class="section-title" style="font-size: 14px;">✍️ Lançamento Manual de Corrida</div>
+          <div class="section-title" style="font-size: 14px;">Lançamento Manual de Corrida</div>
           <form id="workout-form" onsubmit="submitWorkout(event)">
             <div class="form-group">
               <label>Tipo de Atividade</label>
               <select id="workoutType" onchange="toggleManualFields()">
-                <option value="corrida">🏃‍♂️ Corrida / Rodagem</option>
-                <option value="educativo">⚡ Educativos de Corrida</option>
-                <option value="mobilidade">🧘‍♂️ Mobilidade / Alongamento</option>
+                <option value="corrida">Corrida / Rodagem</option>
+                <option value="educativo">Educativos de Corrida</option>
+                <option value="mobilidade">Mobilidade / Alongamento</option>
               </select>
             </div>
             <div class="form-group">
               <label>Título / Descrição</label>
-              <input type="text" id="title" placeholder="Ex: Rodagem Z2 Matinal" required>
+              <input type="text" id="title" placeholder="Rodagem Z2" required>
             </div>
             <div class="form-group" id="field-distance">
               <label>Distância (km)</label>
-              <input type="number" step="0.1" id="distanceKm" value="5.0" placeholder="0.0">
+              <input type="number" step="0.1" id="distanceKm" value="4.5" placeholder="4.5">
             </div>
             <div class="form-group">
               <label>Duração (minutos)</label>
-              <input type="number" id="durationMinutes" placeholder="0" required>
+              <input type="number" id="durationMinutes" placeholder="30" required>
             </div>
             <div class="form-group">
               <label>Data do Treino</label>
@@ -288,10 +282,9 @@
           <hr class="divider">
 
           <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span>🏆 Conquistas & Evolução</span>
+            <span>Conquistas & Evolução</span>
           </div>
           <div id="badgesContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
-
         </div>
       </div>
     </div>
@@ -300,43 +293,69 @@
   <script>
     document.getElementById('activityDate').valueAsDate = new Date();
 
-    // --- CONFIGURAÇÃO DE PERIODIZAÇÃO DE CORRIDA (MACROCICLOS) ---
+    const LOOP_KM = 1.5;
+    const EASY_RUN_KM = 4.5;     // 3 voltas de 1,5 km
+    const QUALITY_MIN_KM = 5.0;  // Faixa de qualidade: 5,0 km a 6,0 km
+    const QUALITY_MAX_KM = 6.0;
+    const LONG_RUN_MAX_KM = 10.0;
+    const BASE_WEEKLY_KM = (3 * EASY_RUN_KM) + (2 * QUALITY_MIN_KM) + 9.0; // 32.5 km
+
+    function roundToHalfKm(km) {
+      return Math.round(km * 2) / 2;
+    }
+
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    function formatSessionVolume(rawKm) {
+      const safeKm = roundToHalfKm(Number(rawKm || EASY_RUN_KM));
+      const laps = safeKm / LOOP_KM;
+      const lapsLabel = Number.isInteger(laps) ? `${laps} voltas` : `${laps.toFixed(1)} voltas`;
+      return `${safeKm.toFixed(1)} km (${lapsLabel})`;
+    }
+
     function getCycleSpecification(objective) {
       const objStr = String(objective || "").toLowerCase();
       if (objStr.includes("maratona") && !objStr.includes("meia")) {
-        return { totalWeeks: 16, baseWeeklyKm: 45.0, minFloorKm: 36.0, raceDistKm: 42.2, label: "Maratona (42 km)", isRaceCycle: true };
+        return { totalWeeks: 16, baseWeeklyKm: 34.5, minFloorKm: BASE_WEEKLY_KM, raceDistKm: 42.2, label: "Maratona (42 km)", isRaceCycle: true };
       }
       if (objStr.includes("meia") || objStr.includes("21")) {
-        return { totalWeeks: 12, baseWeeklyKm: 32.0, minFloorKm: 26.0, raceDistKm: 21.1, label: "Meia Maratona (21 km)", isRaceCycle: true };
+        return { totalWeeks: 12, baseWeeklyKm: 33.5, minFloorKm: BASE_WEEKLY_KM, raceDistKm: 21.1, label: "Meia Maratona (21 km)", isRaceCycle: true };
       }
       if (objStr.includes("10 km") || objStr.includes("10km")) {
-        return { totalWeeks: 10, baseWeeklyKm: 26.0, minFloorKm: 21.0, raceDistKm: 10.0, label: "10 km (Resistência & Pace)", isRaceCycle: true };
+        return { totalWeeks: 10, baseWeeklyKm: 33.0, minFloorKm: BASE_WEEKLY_KM, raceDistKm: 10.0, label: "10 km (Resistência & Pace)", isRaceCycle: true };
       }
       if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
-        return { totalWeeks: 8, baseWeeklyKm: 22.0, minFloorKm: 18.0, raceDistKm: 5.0, label: "5 km (Velocidade)", isRaceCycle: true };
+        return { totalWeeks: 8, baseWeeklyKm: 32.5, minFloorKm: BASE_WEEKLY_KM, raceDistKm: 5.0, label: "5 km (Velocidade)", isRaceCycle: true };
       }
-      return { totalWeeks: 4, baseWeeklyKm: 20.0, minFloorKm: 15.0, raceDistKm: 5.0, label: "Ciclo Base de Corrida", isRaceCycle: true };
+      return { totalWeeks: 4, baseWeeklyKm: BASE_WEEKLY_KM, minFloorKm: BASE_WEEKLY_KM, raceDistKm: 5.0, label: "Perda de Peso Progressiva", isRaceCycle: false };
     }
 
     function getCyclePhaseDetails(weekNum, totalWeeks, isRaceCycle) {
+      if (!isRaceCycle) {
+        if (weekNum % 4 === 0) return { name: `Semana ${weekNum}: Consolidação Metabólica (Deload)`, factor: 0.96, isRaceWeek: false };
+        return { name: `Semana ${weekNum}: Queima Calórica Progressiva`, factor: 1.04, isRaceWeek: false };
+      }
+
       if (weekNum === totalWeeks) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final & Dia da Prova 🏆`, factor: 0.65, isRaceWeek: true };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Polimento Final & Dia da Prova`, factor: 0.90, isRaceWeek: true };
       }
       if (totalWeeks >= 12 && weekNum === totalWeeks - 1) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento (Redução de Carga)`, factor: 0.85, isRaceWeek: false };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Pré-Polimento`, factor: 0.95, isRaceWeek: false };
       }
       if (weekNum % 4 === 0) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.82, isRaceWeek: false };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Deload / Regenerativa`, factor: 0.95, isRaceWeek: false };
       }
 
       const progressRatio = weekNum / totalWeeks;
       if (progressRatio <= 0.35) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Base Aeróbica e Adaptação`, factor: 1.05, isRaceWeek: false };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Base Aeróbica e Adaptação`, factor: 1.03, isRaceWeek: false };
       }
       if (progressRatio <= 0.70) {
-        return { name: `Semana ${weekNum}/${totalWeeks}: Construção e Limiar`, factor: 1.07, isRaceWeek: false };
+        return { name: `Semana ${weekNum}/${totalWeeks}: Construção e Limiar`, factor: 1.05, isRaceWeek: false };
       }
-      return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.08, isRaceWeek: false };
+      return { name: `Semana ${weekNum}/${totalWeeks}: Pico Específico de Carga`, factor: 1.06, isRaceWeek: false };
     }
 
     async function loadDashboard() {
@@ -389,7 +408,6 @@
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         
-        // Janela Segunda a Domingo
         const dayOfWeek = now.getDay();
         const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
         
@@ -436,7 +454,7 @@
           })
           .reduce((acc, curr) => acc + (parseFloat(curr.distanceKm || curr.distance) || 0), 0);
 
-        let rawCycleStart = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-10-05T00:00:00');
+        let rawCycleStart = new Date((activeCycle && activeCycle.startDate) ? activeCycle.startDate : '2026-11-23T12:00:00');
         rawCycleStart.setHours(0, 0, 0, 0);
         
         const startDayOfWeek = rawCycleStart.getDay();
@@ -454,67 +472,64 @@
 
         const phaseInfo = getCyclePhaseDetails(absoluteWeekNumber, cycleSpec.totalWeeks, cycleSpec.isRaceCycle);
 
-        const expectedCurveVolume = cycleSpec.baseWeeklyKm * Math.pow(1.04, Math.min(absoluteWeekNumber - 1, cycleSpec.totalWeeks - 2));
-        const protectedFloor = Math.max(cycleSpec.minFloorKm, expectedCurveVolume * 0.80);
+        const expectedCurveVolume = cycleSpec.baseWeeklyKm * Math.pow(1.03, Math.min(absoluteWeekNumber - 1, cycleSpec.totalWeeks - 2));
+        const protectedFloor = Math.max(cycleSpec.minFloorKm, expectedCurveVolume * 0.85);
 
         const effectiveBaseKm = Math.max(previousWeekKm, protectedFloor);
-        const rawDynamicTarget = effectiveBaseKm * phaseInfo.factor;
-        
-        const dynamicTargetKm = phaseInfo.isRaceWeek
-          ? Math.max(cycleSpec.raceDistKm + 4.0, cycleSpec.minFloorKm * 0.65)
-          : Math.max(cycleSpec.minFloorKm, rawDynamicTarget);
+        const baseTargetKm = roundToHalfKm(effectiveBaseKm * phaseInfo.factor);
 
         const basePaceSecs = calculateBasePace(workouts);
 
         const weightDiff = profile.currentWeight - profile.targetWeight;
-        let projectionText = "Meta Atingida! 🎉";
+        let projectionText = "Meta Atingida!";
         if (weightDiff > 0) {
           const weeklyLossRate = 0.6; 
           const estimatedWeeks = Math.ceil(weightDiff / weeklyLossRate);
           projectionText = `Faltam ${weightDiff.toFixed(1)}kg (~${estimatedWeeks} semanas)`;
         }
 
-        document.getElementById('subtitle-info').innerText = `Ciclo de Corrida | Pace Base: ${formatPace(basePaceSecs)} /km`;
-        document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
-        document.getElementById('m-target-km').innerText = `${dynamicTargetKm.toFixed(2)} km`;
-        document.getElementById('m-cycle-phase').innerText = phaseInfo.name;
-        document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
-        
-        const raceBannerHtml = `<span style="color: var(--accent-green); font-size: 11px; display: block; margin-top: 4px;">🏁 Data Alvo / Dia da Prova (Domingo final): <strong>${raceDayFormatted}</strong></span>`;
-        const floorNotice = (!phaseInfo.isRaceWeek && previousWeekKm < protectedFloor)
-          ? `<span style="color: var(--accent-blue); font-size: 11px; display: block; margin-top: 4px;">🛡️ Piso de proteção ativo (${protectedFloor.toFixed(1)} km): mantendo a curva estrutural.</span>` 
-          : '';
-
-        document.getElementById('rationale-box').innerHTML = `${objectiveConfig.rationale} <br><strong style="color: var(--accent-yellow);">Fase do Macrociclo:</strong> ${phaseInfo.name}.${raceBannerHtml}${floorNotice}`;
-
         const sessionsContainer = document.getElementById('sessions-container');
-        let evaluatedSessions = objectiveConfig.getSessions(dynamicTargetKm);
+        let evaluatedSessions = objectiveConfig.getSessions(baseTargetKm);
 
         if (phaseInfo.isRaceWeek && cycleSpec.isRaceCycle) {
           evaluatedSessions = [
-            { dayOfWeek: "Segunda-feira", sessionType: "Trote Regenerativo Leve", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: `3.0 km`, description: "Soltura leve para iniciar a semana da prova.", effort: "Muito leve", videoSearchTerm: "Rodagem leve recuperação" },
+            { dayOfWeek: "Segunda-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: formatSessionVolume(EASY_RUN_KM), rawKm: EASY_RUN_KM, description: "3 voltas leves no circuito (~30 min).", effort: "Muito leve", videoSearchTerm: "Rodagem leve recuperação" },
             { 
-              dayOfWeek: "Terça-feira", sessionType: "Ativação Neuromuscular (Polimento)", zone: "Z4", zoneDesc: "Estímulo Curto", isRun: true, suggestedDist: `4.0 km`, description: "Volume baixo com tiros curtos para manter o tônus.", effort: "Solto e rápido", videoSearchTerm: "Treino semana de prova",
+              dayOfWeek: "Terça-feira", sessionType: "Ativação Neuromuscular (Polimento)", zone: "Z4", zoneDesc: "Estímulo Curto", isRun: true, suggestedDist: formatSessionVolume(QUALITY_MIN_KM), rawKm: QUALITY_MIN_KM, description: "Sessão curta para manter o tônus no ritmo da prova.", effort: "Solto e rápido", videoSearchTerm: "Treino semana de prova",
               steps: [
-                { label: "Aquecimento", detail: "1.5 km trote leve (Z1)" },
+                { label: "Aquecimento", detail: "1.5 km (1 volta) trote leve (Z1)" },
                 { label: "Ativação", detail: "4x 200m em ritmo de prova / 200m caminhando" },
-                { label: "Desaquecimento", detail: "1.0 km trote muito leve" }
+                { label: "Desaquecimento", detail: "1.5 km (1 volta) trote muito leve" }
               ]
             },
-            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica Curta", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `4.0 km`, description: "Manutenção de ritmo conversacional.", effort: "Confortável", videoSearchTerm: "Rodagem aeróbica leve" },
-            { dayOfWeek: "Quinta-feira", sessionType: "Trote Solto de Manutenção", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `3.0 km`, description: "Soltura para evitar rigidez muscular.", effort: "Leve", videoSearchTerm: "" },
-            { dayOfWeek: "Sexta-feira", sessionType: "Descanso Total (Pré-Prova)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Recuperação completa do sistema nervoso.", effort: "Repouso", videoSearchTerm: "" },
-            { dayOfWeek: "Sábado", sessionType: "Shakeout Run (Ativação Final)", zone: "Z1", zoneDesc: "Ativação", isRun: true, suggestedDist: `2.0 km`, description: "15 min de trote leve + 3 acelerações curtas de 80m.", effort: "Super leve", videoSearchTerm: "Shakeout run antes da prova" },
+            { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica Leve", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: formatSessionVolume(EASY_RUN_KM), rawKm: EASY_RUN_KM, description: "3 voltas em ritmo conversacional.", effort: "Confortável", videoSearchTerm: "Rodagem aeróbica leve" },
+            { dayOfWeek: "Quinta-feira", sessionType: "Ritmo Leve de Manutenção", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: formatSessionVolume(QUALITY_MIN_KM), rawKm: QUALITY_MIN_KM, description: "Sessão controlada para manter fluidez sem fadiga.", effort: "Moderado", videoSearchTerm: "" },
+            { dayOfWeek: "Sexta-feira", sessionType: "Rodagem Curta de Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: formatSessionVolume(EASY_RUN_KM), rawKm: EASY_RUN_KM, description: "3 voltas leves antes do fim de semana.", effort: "Muito leve", videoSearchTerm: "" },
+            { dayOfWeek: "Sábado", sessionType: "Longo de Controle (Pré-Prova)", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: formatSessionVolume(7.5), rawKm: 7.5, description: "Longo moderado de controle antes do dia da prova.", effort: "Constante", videoSearchTerm: "Treino longo antes da prova" },
             { 
-              dayOfWeek: `Domingo (${raceDayFormatted})`, sessionType: `🏆 DIA DA PROVA / TESTE ALVO (${cycleSpec.raceDistKm} km)`, zone: "RACE", zoneDesc: "Competição", isRun: true, isRaceDay: true, suggestedDist: `${cycleSpec.raceDistKm} km`, description: "Dia de colheita! Execute sua estratégia de ritmo e cruze a linha com força total.", effort: "Máximo Planejado", videoSearchTerm: "Estratégia de prova corrida",
+              dayOfWeek: `Domingo (${raceDayFormatted})`, sessionType: `DIA DA PROVA / TESTE ALVO (${cycleSpec.raceDistKm} km)`, zone: "RACE", zoneDesc: "Competição", isRun: true, isRaceDay: true, suggestedDist: `${cycleSpec.raceDistKm} km`, rawKm: 0, description: "Execute sua estratégia de ritmo e finalize o ciclo.", effort: "Máximo Planejado", videoSearchTerm: "Estratégia de prova corrida",
               steps: [
                 { label: "Pré-Largada", detail: "10-15 min trote leve + educativos + 3 tiros curtos" },
                 { label: "Prova Principal", detail: `${cycleSpec.raceDistKm} km em ritmo alvo constante` },
-                { label: "Pós-Prova", detail: "Caminhada leve, hidratação e comemoração!" }
+                { label: "Pós-Prova", detail: "Caminhada leve, hidratação e recuperação" }
               ]
             }
           ];
         }
+
+        const plannedWeeklyKm = evaluatedSessions
+          .filter(s => s.isRun && !s.isRaceDay)
+          .reduce((acc, s) => acc + (Number(s.rawKm) || 0), 0);
+
+        const displayTargetKm = plannedWeeklyKm > 0 ? plannedWeeklyKm : baseTargetKm;
+
+        document.getElementById('subtitle-info').innerText = `Circuito 1,5 km/volta • Leves: 4,5 km (3 voltas) • Longo até 10,0 km • Pace Base: ${formatPace(basePaceSecs)} /km`;
+        document.getElementById('m-week-km').innerText = `${currentWeekKm.toFixed(1)} km`;
+        document.getElementById('m-target-km').innerText = `${displayTargetKm.toFixed(1)} km`;
+        document.getElementById('m-cycle-phase').innerText = cycleSpec.isRaceCycle
+          ? `${phaseInfo.name} • Prova: ${raceDayFormatted}`
+          : phaseInfo.name;
+        document.getElementById('m-weight').innerHTML = `${profile.currentWeight.toFixed(1).replace('.', ',')}kg <span style="font-size: 10px; display: block; color: var(--accent-blue); margin-top:2px;">${projectionText}</span>`;
         
         sessionsContainer.innerHTML = evaluatedSessions.map(s => {
           const zoneClass = s.isRaceDay ? 'race-badge' : s.zone.toLowerCase();
@@ -523,9 +538,9 @@
           if (s.isRun) {
             const suggestedPace = s.isRaceDay ? 'Ritmo Alvo de Prova' : getPaceRangeForZone(basePaceSecs, s.zone);
             detailsHtml = `
-              <span>📏 Volume Proposto: <strong>${s.suggestedDist}</strong></span>
-              <span>⚡ Pace Alvo: <strong>${suggestedPace}</strong></span>
-              <span>🎯 Esforço: <strong>${s.effort}</strong></span>
+              <span>Volume Proposto: <strong>${s.suggestedDist}</strong></span>
+              <span>Pace Alvo: <strong>${suggestedPace}</strong></span>
+              <span>Esforço: <strong>${s.effort}</strong></span>
             `;
           }
 
@@ -540,7 +555,7 @@
 
             structuredHtml = `
               <div class="structured-blocks">
-                <div class="structured-blocks-title">⚡ Estruturação do Treino de Corrida</div>
+                <div class="structured-blocks-title">Estruturação do Treino de Corrida</div>
                 ${stepsRows}
               </div>
             `;
@@ -556,7 +571,7 @@
               <div class="desc">${s.description}</div>
               ${s.isRun ? `<div class="workout-details">${detailsHtml}</div>` : ''}
               ${structuredHtml}
-              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">▶ YouTube: ${s.videoSearchTerm}</a>` : ''}
+              ${s.videoSearchTerm ? `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.videoSearchTerm)}" target="_blank" class="tag">YouTube: ${s.videoSearchTerm}</a>` : ''}
             </div>
           `;
         }).join('');
@@ -598,162 +613,173 @@
       return `${formatPace(baseSecs * 0.95)} - ${formatPace(baseSecs * 1.05)} /km`;
     }
 
-    // --- MATRIZ DE DISTRIBUIÇÃO DE CORRIDA EM 6 DIAS (SEGUNDA A SÁBADO) ---
+    // Rodagens leves em 4,5 km (3 voltas), qualidade entre 5,0 e 6,0 km e longo de sábado até 10,0 km
+    function buildSixDaySessions(targetKm, config) {
+      const r1 = EASY_RUN_KM;
+      const r2 = EASY_RUN_KM;
+      const r3 = EASY_RUN_KM;
+      const easyTotal = r1 + r2 + r3; // 13,5 km
+
+      const extraVolume = Math.max(0, roundToHalfKm(targetKm) - BASE_WEEKLY_KM);
+
+      const q1 = clamp(roundToHalfKm(QUALITY_MIN_KM + (extraVolume * 0.25)), QUALITY_MIN_KM, QUALITY_MAX_KM);
+      const q2 = clamp(roundToHalfKm(QUALITY_MIN_KM + (extraVolume * 0.25)), QUALITY_MIN_KM, QUALITY_MAX_KM);
+
+      const remainingAfterQuality = Math.max(0, roundToHalfKm(targetKm) - (easyTotal + q1 + q2));
+      const longK = clamp(roundToHalfKm(Math.max(8.5, remainingAfterQuality)), QUALITY_MAX_KM + 1.0, LONG_RUN_MAX_KM);
+
+      const reps = Math.max(3, Math.min(6, Math.round((q1 - 2.0) / 0.8)));
+      const mainPace = Math.max(2.5, roundToHalfKm(q2 - 2.0)).toFixed(1);
+
+      return [
+        {
+          dayOfWeek: "Segunda-feira",
+          sessionType: "Rodagem Regenerativa",
+          zone: "Z1",
+          zoneDesc: "Muito Leve",
+          isRun: true,
+          rawKm: r1,
+          suggestedDist: formatSessionVolume(r1),
+          description: "3 voltas leves no circuito para iniciar a semana (~30 min).",
+          effort: "Confortável",
+          videoSearchTerm: "Rodagem regenerativa corrida"
+        },
+        {
+          dayOfWeek: "Terça-feira",
+          sessionType: config.tueTitle,
+          zone: config.tueZone,
+          zoneDesc: config.tueZoneDesc,
+          isRun: true,
+          rawKm: q1,
+          suggestedDist: formatSessionVolume(q1),
+          description: config.tueDesc,
+          effort: config.tueEffort,
+          videoSearchTerm: config.tueVideo,
+          steps: [
+            { label: "Aquecimento", detail: "1.0 km trote leve" },
+            { label: "Bloco Principal", detail: `${reps}x 600m forte / 200m trote` },
+            { label: "Desaquecimento", detail: "1.0 km trote solto" }
+          ]
+        },
+        {
+          dayOfWeek: "Quarta-feira",
+          sessionType: "Rodagem Aeróbica Leve",
+          zone: "Z2",
+          zoneDesc: "Resistência",
+          isRun: true,
+          rawKm: r2,
+          suggestedDist: formatSessionVolume(r2),
+          description: "3 voltas contínuas em ritmo conversacional.",
+          effort: "Conversacional",
+          videoSearchTerm: "Rodagem aeróbica leve"
+        },
+        {
+          dayOfWeek: "Quinta-feira",
+          sessionType: config.thuTitle,
+          zone: config.thuZone,
+          zoneDesc: config.thuZoneDesc,
+          isRun: true,
+          rawKm: q2,
+          suggestedDist: formatSessionVolume(q2),
+          description: config.thuDesc,
+          effort: config.thuEffort,
+          videoSearchTerm: config.thuVideo,
+          steps: [
+            { label: "Aquecimento", detail: "1.0 km trote leve" },
+            { label: "Bloco Contínuo", detail: `${mainPace} km em ritmo sustentado` },
+            { label: "Desaquecimento", detail: "1.0 km trote leve" }
+          ]
+        },
+        {
+          dayOfWeek: "Sexta-feira",
+          sessionType: "Rodagem Curta de Soltura",
+          zone: "Z1",
+          zoneDesc: "Regenerativo",
+          isRun: true,
+          rawKm: r3,
+          suggestedDist: formatSessionVolume(r3),
+          description: "3 voltas leves de soltura antes do longo.",
+          effort: "Muito leve",
+          videoSearchTerm: ""
+        },
+        {
+          dayOfWeek: "Sábado",
+          sessionType: "Longo de Resistência",
+          zone: "Z2",
+          zoneDesc: "Resistência",
+          isRun: true,
+          rawKm: longK,
+          suggestedDist: formatSessionVolume(longK),
+          description: "Maior quilometragem da semana para construir resistência.",
+          effort: "Constante",
+          videoSearchTerm: config.satVideo
+        },
+        {
+          dayOfWeek: "Domingo",
+          sessionType: "Descanso Total (Repouso)",
+          zone: "Z0",
+          zoneDesc: "Descanso",
+          isRun: false,
+          rawKm: 0,
+          duration: "0 min",
+          description: "Descanso total para recuperação muscular.",
+          effort: "Repouso",
+          videoSearchTerm: ""
+        }
+      ];
+    }
+
     function getObjectiveMatrix(objective) {
       const objStr = String(objective || "").toLowerCase();
 
       if (objStr.includes("maratona") && !objStr.includes("meia")) {
         return {
-          text: "Meta: Maratona (42 km - 16 Semanas / 6 Dias)",
-          rationale: "Foco em <strong>6 dias de corrida</strong> distribuídos para acumular volume com segurança: rodagens regenerativas, limiar e o longão de fim de semana.",
-          getSessions: (target) => {
-            const r1 = parseFloat((target * 0.12).toFixed(1));
-            const intK = parseFloat((target * 0.20).toFixed(1));
-            const r2 = parseFloat((target * 0.12).toFixed(1));
-            const mpK = parseFloat((target * 0.18).toFixed(1));
-            const r3 = parseFloat((target * 0.08).toFixed(1));
-            const longK = parseFloat((target * 0.30).toFixed(1));
-
-            return [
-              { dayOfWeek: "Segunda-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${r1} km`, description: "Soltura leve para iniciar a semana.", effort: "Confortável", videoSearchTerm: "Rodagem regenerativa corrida" },
-              { 
-                dayOfWeek: "Terça-feira", sessionType: "Limiar Longo (Tempo Run)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intK} km`, description: "Sustentação de ritmo forte para economia de corrida.", effort: "Forte controlado", videoSearchTerm: "Treino tempo run maratona",
-                steps: [
-                  { label: "Aquecimento", detail: "2.0 km trote leve (Z1)" },
-                  { label: "Bloco Principal", detail: `${Math.max(3, (intK - 3.0)).toFixed(1)} km contínuo em Z4` },
-                  { label: "Desaquecimento", detail: "1.0 km trote regenerativo" }
-                ]
-              },
-              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica Leve", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${r2} km`, description: "Base aeróbica contínua.", effort: "Conversacional", videoSearchTerm: "Rodagem aeróbica leve" },
-              { 
-                dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico de Prova (MP)", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${mpK} km`, description: "Adaptação metabólica ao pace da maratona.", effort: "Constante", videoSearchTerm: "Ritmo de maratona treino",
-                steps: [
-                  { label: "Aquecimento", detail: "2.0 km trote progressivo" },
-                  { label: "Ritmo de Prova", detail: `${Math.max(4, (mpK - 3.0)).toFixed(1)} km travado no pace alvo` },
-                  { label: "Desaquecimento", detail: "1.0 km trote leve" }
-                ]
-              },
-              { dayOfWeek: "Sexta-feira", sessionType: "Rodagem Curta de Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: `${r3} km`, description: "Soltura pré-longão.", effort: "Muito leve", videoSearchTerm: "" },
-              { dayOfWeek: "Sábado", sessionType: "Longão de Resistência", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longK} km`, description: "Treino chave da semana para adaptação de glicogênio.", effort: "Constante", videoSearchTerm: "Treino longo maratona" },
-              { dayOfWeek: "Domingo", sessionType: "Descanso Total (Repouso)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Dia sagrado de descanso total e recuperação.", effort: "Repouso", videoSearchTerm: "" }
-            ];
-          }
+          text: "Meta: Maratona (42 km - 16 Semanas)",
+          getSessions: (target) => buildSixDaySessions(target, {
+            tueTitle: "Limiar / Tempo Run", tueZone: "Z4", tueZoneDesc: "Limiar", tueDesc: "Ritmo forte controlado para economia de corrida.", tueEffort: "Forte controlado", tueVideo: "Treino tempo run maratona",
+            thuTitle: "Ritmo Específico", thuZone: "Z3", thuZoneDesc: "Ritmo Alvo", thuDesc: "Bloco contínuo em ritmo sustentado.", thuEffort: "Constante", thuVideo: "Ritmo de maratona treino",
+            satVideo: "Treino longo maratona"
+          })
         };
       }
-      else if (objStr.includes("meia") || objStr.includes("21")) {
+      if (objStr.includes("meia") || objStr.includes("21")) {
         return {
-          text: "Meta: Meia Maratona (21 km - 12 Semanas / 6 Dias)",
-          rationale: "Foco em <strong>6 dias de corrida</strong>: equilibrando intervalos longos, rodagens em Z2 e longão progressivo.",
-          getSessions: (target) => {
-            const r1 = parseFloat((target * 0.12).toFixed(1));
-            const intK = parseFloat((target * 0.22).toFixed(1));
-            const r2 = parseFloat((target * 0.12).toFixed(1));
-            const paceK = parseFloat((target * 0.20).toFixed(1));
-            const r3 = parseFloat((target * 0.08).toFixed(1));
-            const longK = parseFloat((target * 0.26).toFixed(1));
-
-            return [
-              { dayOfWeek: "Segunda-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${r1} km`, description: "Soltura leve pós-fim de semana.", effort: "Leve", videoSearchTerm: "Rodagem leve" },
-              { 
-                dayOfWeek: "Terça-feira", sessionType: "Intervalado Longo (1k - 2k)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intK} km`, description: "Repetições longas para tolerância ao lactato.", effort: "Duro controlado", videoSearchTerm: "Treino intervalado 21km",
-                steps: [
-                  { label: "Aquecimento", detail: "2.0 km trote leve" },
-                  { label: "Bloco Principal", detail: `${Math.max(2, Math.round((intK - 3.0) / 1.5))}x 1.5 km forte / 2 min trote` },
-                  { label: "Desaquecimento", detail: "1.0 km trote solto" }
-                ]
-              },
-              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${r2} km`, description: "Construção de base aeróbica.", effort: "Conversacional", videoSearchTerm: "" },
-              { 
-                dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Meia Maratona", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${paceK} km`, description: "Bloco contínuo no ritmo alvo dos 21 km.", effort: "Constante", videoSearchTerm: "Ritmo meia maratona",
-                steps: [
-                  { label: "Aquecimento", detail: "1.5 km trote leve" },
-                  { label: "Bloco Contínuo", detail: `${Math.max(3, (paceK - 2.5)).toFixed(1)} km em Z3` },
-                  { label: "Desaquecimento", detail: "1.0 km trote" }
-                ]
-              },
-              { dayOfWeek: "Sexta-feira", sessionType: "Rodagem Curta de Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: `${r3} km`, description: "Soltura leve pré-longão.", effort: "Muito leve", videoSearchTerm: "" },
-              { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longK} km`, description: "Construção de resistência de longa duração.", effort: "Constante", videoSearchTerm: "Treino longo 21km" },
-              { dayOfWeek: "Domingo", sessionType: "Descanso Total (Repouso)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.", effort: "Repouso", videoSearchTerm: "" }
-            ];
-          }
+          text: "Meta: Meia Maratona (21 km - 12 Semanas)",
+          getSessions: (target) => buildSixDaySessions(target, {
+            tueTitle: "Intervalado de Limiar", tueZone: "Z4", tueZoneDesc: "Limiar", tueDesc: "Séries controladas para tolerância ao esforço.", tueEffort: "Duro controlado", tueVideo: "Treino intervalado 21km",
+            thuTitle: "Ritmo de Meia Maratona", thuZone: "Z3", thuZoneDesc: "Ritmo Alvo", thuDesc: "Bloco contínuo no pace planejado.", thuEffort: "Constante", thuVideo: "Ritmo meia maratona",
+            satVideo: "Treino longo 21km"
+          })
         };
       }
-      else if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
+      if (objStr.includes("5 km") || objStr.includes("5km") || objStr.includes("velocidade")) {
         return {
-          text: "Meta: 5 km (Velocidade - 8 Semanas / 6 Dias)",
-          rationale: "Foco em <strong>6 dias de corrida</strong>: combinando tiros curtos em Z5, ritmo de prova em Z4 e rodagens diárias consistentes.",
-          getSessions: (target) => {
-            const r1 = parseFloat((target * 0.12).toFixed(1));
-            const intK = parseFloat((target * 0.25).toFixed(1));
-            const r2 = parseFloat((target * 0.15).toFixed(1));
-            const paceK = parseFloat((target * 0.22).toFixed(1));
-            const r3 = parseFloat((target * 0.10).toFixed(1));
-            const longK = parseFloat((target * 0.16).toFixed(1));
-
-            return [
-              { dayOfWeek: "Segunda-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${r1} km`, description: "Soltura leve para iniciar a semana.", effort: "Confortável", videoSearchTerm: "Rodagem leve recuperação" },
-              { 
-                dayOfWeek: "Terça-feira", sessionType: "Tiros / Intervalado Curto (VO2Max)", zone: "Z5", zoneDesc: "Esforço Máximo", isRun: true, suggestedDist: `${intK} km`, description: "Séries rápidas para ganho de velocidade pura.", effort: "Muito ofegante", videoSearchTerm: "Treino intervalado 5km velocidade",
-                steps: [
-                  { label: "Aquecimento", detail: "1.5 km trote leve + Educativos" },
-                  { label: "Tiros", detail: "4x 400m forte / 400m trote leve" },
-                  { label: "Desaquecimento", detail: "1.0 km trote solto" }
-                ]
-              },
-              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica Leve", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${r2} km`, description: "Rodagem contínua em ritmo conversacional.", effort: "Conversacional", videoSearchTerm: "" },
-              { 
-                dayOfWeek: "Quinta-feira", sessionType: "Ritmo de Prova (5k Pace)", zone: "Z4", zoneDesc: "Limiar / Duro", isRun: true, suggestedDist: `${paceK} km`, description: "Blocos na meta de velocidade pretendida.", effort: "Desafiador", videoSearchTerm: "Como baixar o tempo nos 5km",
-                steps: [
-                  { label: "Aquecimento", detail: "1.0 km trote leve" },
-                  { label: "Bloco", detail: "3x 1.0 km em ritmo de prova / 2 min trote" },
-                  { label: "Desaquecimento", detail: "1.0 km trote leve" }
-                ]
-              },
-              { dayOfWeek: "Sexta-feira", sessionType: "Rodagem Curta de Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: `${r3} km`, description: "Soltura pré-fim de semana.", effort: "Muito leve", videoSearchTerm: "" },
-              { dayOfWeek: "Sábado", sessionType: "Rodagem Contínua Moderada", zone: "Z3", zoneDesc: "Moderado", isRun: true, suggestedDist: `${longK} km`, description: "Base aeróbica e consolidação de ritmo.", effort: "Conversa picada", videoSearchTerm: "Treino aeróbico moderado" },
-              { dayOfWeek: "Domingo", sessionType: "Descanso Total (Repouso)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso absoluto.", effort: "Repouso", videoSearchTerm: "" }
-            ];
-          }
+          text: "Meta: 5 km (Velocidade - 8 Semanas)",
+          getSessions: (target) => buildSixDaySessions(target, {
+            tueTitle: "Intervalado / Tiros", tueZone: "Z5", tueZoneDesc: "Esforço Máximo", tueDesc: "Estímulos rápidos para ganho de velocidade.", tueEffort: "Muito ofegante", tueVideo: "Treino intervalado 5km velocidade",
+            thuTitle: "Ritmo de Prova (5k Pace)", tueZone: "Z4", tueZoneDesc: "Limiar / Duro", tueDesc: "Bloco no ritmo alvo dos 5 km.", tueEffort: "Desafiador", tueVideo: "Como baixar o tempo nos 5km",
+            satVideo: "Treino aeróbico moderado"
+          })
         };
       }
-      else {
+      if (objStr.includes("10 km") || objStr.includes("10km")) {
         return {
-          text: "Meta: 10 km (Resistência - 10 Semanas / 6 Dias)",
-          rationale: "Foco em <strong>6 dias de corrida</strong>: expansão de limiar anaeróbico (Z4) e volume fracionado.",
-          getSessions: (target) => {
-            const r1 = parseFloat((target * 0.12).toFixed(1));
-            const intK = parseFloat((target * 0.24).toFixed(1));
-            const r2 = parseFloat((target * 0.14).toFixed(1));
-            const paceK = parseFloat((target * 0.22).toFixed(1));
-            const r3 = parseFloat((target * 0.08).toFixed(1));
-            const longK = parseFloat((target * 0.20).toFixed(1));
-
-            return [
-              { dayOfWeek: "Segunda-feira", sessionType: "Rodagem Regenerativa", zone: "Z1", zoneDesc: "Muito Leve", isRun: true, suggestedDist: `${r1} km`, description: "Soltura leve.", effort: "Leve", videoSearchTerm: "Rodagem regenerativa" },
-              { 
-                dayOfWeek: "Terça-feira", sessionType: "Intervalado Médio (Cruzeiro)", zone: "Z4", zoneDesc: "Limiar", isRun: true, suggestedDist: `${intK} km`, description: "Séries longas para sustentação de limiar.", effort: "Forte sustentado", videoSearchTerm: "Treino intervalado 10km",
-                steps: [
-                  { label: "Aquecimento", detail: "2.0 km trote leve" },
-                  { label: "Bloco", detail: "3x 1.0 km forte / 90 seg trote" },
-                  { label: "Desaquecimento", detail: "1.0 km trote solto" }
-                ]
-              },
-              { dayOfWeek: "Quarta-feira", sessionType: "Rodagem Aeróbica", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${r2} km`, description: "Rodagem aeróbica constante.", effort: "Conversacional", videoSearchTerm: "" },
-              { 
-                dayOfWeek: "Quinta-feira", sessionType: "Ritmo Específico 10k", zone: "Z3", zoneDesc: "Ritmo Alvo", isRun: true, suggestedDist: `${paceK} km`, description: "Blocos no pace planejado para prova.", effort: "Constante", videoSearchTerm: "Ritmo de prova 10km",
-                steps: [
-                  { label: "Aquecimento", detail: "1.5 km trote" },
-                  { label: "Bloco", detail: "4.0 km em ritmo de cruzeiro 10k" },
-                  { label: "Desaquecimento", detail: "1.0 km trote" }
-                ]
-              },
-              { dayOfWeek: "Sexta-feira", sessionType: "Rodagem Curta de Soltura", zone: "Z1", zoneDesc: "Regenerativo", isRun: true, suggestedDist: `${r3} km`, description: "Soltura leve.", effort: "Muito leve", videoSearchTerm: "" },
-              { dayOfWeek: "Sábado", sessionType: "Longo Progressivo", zone: "Z2", zoneDesc: "Resistência", isRun: true, suggestedDist: `${longK} km`, description: "Rodagem longa construindo ritmo.", effort: "Constante", videoSearchTerm: "Treino longo 10km" },
-              { dayOfWeek: "Domingo", sessionType: "Descanso Total (Repouso)", zone: "Z0", zoneDesc: "Descanso", isRun: false, duration: "0 min", description: "Repouso completo.", effort: "Repouso", videoSearchTerm: "" }
-            ];
-          }
+          text: "Meta: 10 km (Resistência - 10 Semanas)",
+          getSessions: (target) => buildSixDaySessions(target, {
+            tueTitle: "Intervalado Médio", tueZone: "Z4", tueZoneDesc: "Limiar", tueDesc: "Séries para sustentação de limiar.", tueEffort: "Forte sustentado", tueVideo: "Treino intervalado 10km",
+            thuTitle: "Ritmo Específico 10k", tueZone: "Z3", thuZoneDesc: "Ritmo Alvo", tueDesc: "Bloco no ritmo planejado para 10 km.", tueEffort: "Constante", tueVideo: "Ritmo de prova 10km",
+            satVideo: "Treino longo 10km"
+          })
         };
       }
+      return {
+        text: "Perda de Peso Progressiva (Ciclos 4 Sem.)",
+        getSessions: (target) => buildSixDaySessions(target, {
+          tueTitle: "Intervalado Moderado", tueZone: "Z3", tueZoneDesc: "Moderado", tueDesc: "Estímulo intervalado para gasto calórico.", tueEffort: "Moderado", tueVideo: "Treino intervalado para emagrecer",
+          thuTitle: "Ritmo Contínuo (Z2/Z3)", tueZone: "Z2", tueZoneDesc: "Resistência", tueDesc: "Rodagem aeróbica sustentada.", tueEffort: "Constante", tueVideo: "Ritmo de prova 10km",
+          satVideo: "Treino longo para perda de peso"
+        })
+      };
     }
 
     function toggleManualFields() {
